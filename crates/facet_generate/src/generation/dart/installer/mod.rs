@@ -18,16 +18,19 @@
 //!
 //! Unlike the TypeScript installer (which copies `serde` and `bincode`
 //! runtime sources alongside the generated code), the Dart installer
-//! **does not install any runtime files**. The Dart bincode runtime
-//! (`d_bincode`) is expected to be vendored into the consuming project
-//! separately — see `verification/dart-bincode-compat/README.md` and
-//! the Obsidian decision note §13.5 for the reasoning.
+//! **does not install any runtime files**. Instead, when bincode encoding
+//! is active, the manifest declares a `d_bincode: ^3.2.0` hosted dependency
+//! from pub.dev (<https://pub.dev/packages/d_bincode>). Consumers just run
+//! `dart pub get` — no manual vendoring step required.
 //!
 //! # English / 中文
 //!
 //! English: see above.
 //! 中文:见英文文档。Dart installer 只负责产出 lib/*.dart + pubspec.yaml,
-//! **不**安装任何运行时文件。bincode 运行时 d_bincode 由消费方项目自行 vendor。
+//! **不**安装任何运行时文件。bincode 编码激活时,manifest 会声明一个
+//! `d_bincode: ^3.2.0` 的 pub.dev hosted 依赖
+//! (<https://pub.dev/packages/d_bincode>),消费方只需 `dart pub get` 即可,
+//! 无需手动 vendor。
 
 use std::{
     fs::{File, create_dir_all},
@@ -79,10 +82,10 @@ impl Installer {
     /// Set the encoding for serialization/deserialization.
     ///
     /// Unlike other language installers, the Dart installer does not install
-    /// any runtime files based on the encoding — it only forwards the encoding
-    /// to the code generator (which decides whether to emit bincode/JSON
-    /// methods on the generated classes). Runtime libraries (`d_bincode`,
-    /// `dart:convert`) are the consuming project's responsibility.
+    /// any runtime files based on the encoding. When set to `Encoding::Bincode`
+    /// it declares a `d_bincode: ^3.2.0` hosted dependency in the manifest
+    /// (resolved from <https://pub.dev/packages/d_bincode>); `Encoding::Json`
+    /// uses Dart's built-in `dart:convert` and declares no extra dependency.
     #[must_use]
     pub const fn encoding(mut self, encoding: Encoding) -> Self {
         self.encoding = encoding;
@@ -157,19 +160,19 @@ impl Installer {
 
         // English: When bincode encoding is active, the generated classes
         // reference `BincodeWriter` / `BincodeReader` from the `d_bincode`
-        // package. We emit a path dependency pointing at a sibling `d_bincode`
-        // directory under the install root; consumers vendor d_bincode there.
-        // 中文:bincode 编码激活时,生成的类会引用 d_bincode 包的 BincodeWriter /
-        // BincodeReader。我们在 pubspec 里声明一个 path 依赖,指向安装根目录下的
-        // 同级 `d_bincode/` 目录,消费方在那里 vendor d_bincode。
+        // package (https://pub.dev/packages/d_bincode). We declare it as a
+        // regular hosted dependency — `dart pub get` pulls it from pub.dev,
+        // no vendoring required.
+        // 中文:bincode 编码激活时,生成的类会引用 d_bincode 包
+        // (https://pub.dev/packages/d_bincode)的 BincodeWriter / BincodeReader。
+        // 直接作为普通 hosted 依赖声明,`dart pub get` 会从 pub.dev 拉取,无需 vendor。
         let need_d_bincode = self.encoding == Encoding::Bincode;
 
         if !self.external_packages.is_empty() || need_d_bincode {
             out.push('\n');
             out.push_str("dependencies:\n");
             if need_d_bincode {
-                out.push_str("  d_bincode:\n");
-                out.push_str("    path: ./d_bincode\n");
+                out.push_str("  d_bincode: ^3.2.0\n");
             }
 
             // English: Sort by namespace name for stable output (BTreeMap iteration is
@@ -241,12 +244,12 @@ impl SourceInstaller for Installer {
         Ok(())
     }
 
-    /// **No-op for Dart.** The Dart bincode runtime (`d_bincode`) is vendored
-    /// into the consuming project separately, not installed alongside generated
-    /// code. See module-level docs for the rationale.
+    /// **No-op for Dart.** The Dart bincode runtime (`d_bincode`) is declared
+    /// as a pub.dev hosted dependency in the manifest, not copied alongside
+    /// generated code. See module-level docs for the rationale.
     fn install_serde_runtime(&mut self) -> Result<(), Error> {
-        // English: intentional no-op — Dart users vendor d_bincode themselves
-        // 中文:故意空实现 —— Dart 用户自己 vendor d_bincode
+        // English: intentional no-op — d_bincode comes from pub.dev via pubspec.
+        // 中文:故意空实现 —— d_bincode 通过 pubspec 从 pub.dev 拉取。
         Ok(())
     }
 

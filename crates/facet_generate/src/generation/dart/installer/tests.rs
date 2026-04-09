@@ -14,11 +14,41 @@ use facet::Facet;
 
 use crate as fg;
 use crate::{
-    generation::{ExternalPackage, PackageLocation, SourceInstaller as _, module::split},
+    generation::{Encoding, ExternalPackage, PackageLocation, SourceInstaller as _, module::split},
     reflect,
 };
 
 use super::Installer;
+
+#[test]
+fn manifest_with_bincode_pulls_d_bincode_from_pub_dev() {
+    // English: When encoding is Bincode, the generated classes need
+    // `BincodeWriter` / `BincodeReader` from the `d_bincode` package on
+    // pub.dev. The manifest should declare it as a hosted dependency — no
+    // vendoring required.
+    // 中文:encoding 为 Bincode 时,生成的类需要 pub.dev 上的 d_bincode 包提供
+    // BincodeWriter / BincodeReader。manifest 应声明 hosted 依赖,无需 vendor。
+    let package_name = "my-package";
+    let install_dir = tempfile::tempdir().unwrap();
+
+    let installer =
+        Installer::new(package_name, install_dir.path()).encoding(Encoding::Bincode);
+
+    let manifest = installer.make_manifest(package_name);
+
+    insta::assert_snapshot!(manifest, @r"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      d_bincode: ^3.2.0
+    ");
+}
 
 #[test]
 fn simple_manifest() {

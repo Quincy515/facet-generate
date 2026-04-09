@@ -99,11 +99,13 @@ impl Dart {
 
 impl Module {
     // English: dart_serde_import_path() removed — Dart doesn't import a Serializer/Deserializer
-    // runtime from an external path; bincode runtime is vendored under lib/vendor/d_bincode/,
-    // JSON uses built-in dart:convert. Plugin module_helpers handles the imports.
+    // runtime from an external path; bincode runtime comes from `package:d_bincode/d_bincode.dart`
+    // (declared as a pub.dev dep in the installer-generated pubspec.yaml), JSON uses built-in
+    // dart:convert. Plugin module_helpers handles the imports.
     // 中文:dart_serde_import_path() 删除 —— Dart 不从外部路径 import Serializer/Deserializer
-    // 运行时;bincode 运行时 vendor 在 lib/vendor/d_bincode/,JSON 用内置 dart:convert。
-    // Plugin 的 module_helpers 负责相应 import。
+    // 运行时;bincode 运行时来自 `package:d_bincode/d_bincode.dart`(通过 installer 生成的
+    // pubspec.yaml 声明为 pub.dev 依赖),JSON 用内置 dart:convert。Plugin 的 module_helpers
+    // 负责相应 import。
 
     fn dart_namespace_import_path(&self, namespace: &str) -> String {
         self.config().external_packages.get(namespace).map_or_else(
