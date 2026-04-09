@@ -54,8 +54,7 @@ use crate::{
         CodeGeneratorConfig, Container, Emitter, Encoding, PackageLocation,
         bincode::BincodePlugin,
         indent::{IndentWrite, Newlines},
-        // English: json::JsonPlugin not yet wired for Dart — see §9.4 of Obsidian note
-        // 中文:Dart 的 JsonPlugin 尚未接入,见 Obsidian 笔记 §9.4
+        json::JsonPlugin,
         module::Module,
         plugin::{EmitContext, EmitterPlugin, VariantInfo},
     },
@@ -78,15 +77,14 @@ impl Dart {
     /// the encoding specified in `config`.
     ///
     /// - [`Encoding::Bincode`] → includes `BincodePlugin`
-    /// - [`Encoding::Json`] → TODO: will include `DartJsonPlugin` once implemented in Step 5c
+    /// - [`Encoding::Json`] → includes `JsonPlugin` (generates `toJson` / `fromJson`
+    ///   matching serde's default externally tagged JSON format)
     /// - [`Encoding::None`] → no plugins
     #[must_use]
     pub fn new(config: &CodeGeneratorConfig, _registry: &crate::Registry) -> Self {
         let plugins: Vec<Arc<dyn EmitterPlugin<Self>>> = match config.encoding {
             Encoding::Bincode => vec![Arc::new(BincodePlugin)],
-            // English: JSON plugin for Dart not yet implemented — see §9.4 of the Obsidian decision note
-            // 中文:Dart 的 JSON plugin 尚未实现,见 Obsidian 决策笔记 §9.4
-            Encoding::Json => vec![],
+            Encoding::Json => vec![Arc::new(JsonPlugin)],
             Encoding::None => vec![],
         };
         Self { plugins }
@@ -646,15 +644,15 @@ fn output_enum_container<W: IndentWrite>(
 // 原生的 `int`/`bool`/`double`/`String`/`List<T>`/`Map<K,V>`/`T?`/`Uint8List`,
 // 不需要像 TypeScript 那样写 `type int32 = number` 之类的别名来提升可读性。
 
-// English: tests.rs covers Encoding::None pure-type output (verified in Step 3).
-// tests_bincode.rs covers BincodePlugin output — re-enabled in Step 5b, snapshots
-// need bulk regeneration via `INSTA_UPDATE=always cargo test` + spot-check + accept.
-// tests_json.rs was deleted — will be re-added in Step 5c when DartJsonPlugin ships.
-// 中文:tests.rs 覆盖 Encoding::None 纯类型输出(Step 3 已验证)。
-// tests_bincode.rs 覆盖 BincodePlugin 输出(Step 5b 重新启用)。
-// tests_json.rs 在 Step 5c 实现 DartJsonPlugin 时重新加入。
+// English: Three test modules cover the three encoding modes:
+// - tests.rs: Encoding::None (pure types, no serialization methods) — Step 3
+// - tests_bincode.rs: Encoding::Bincode (DartBincodePlugin output) — Step 5b
+// - tests_json.rs: Encoding::Json (DartJsonPlugin output) — Step 5c
+// 中文:三个测试模块对应三种编码模式。
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
 #[cfg(test)]
 mod tests_bincode;
+#[cfg(test)]
+mod tests_json;
