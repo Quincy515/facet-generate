@@ -1,0 +1,97 @@
+//! Top-level orchestrator for Dart code generation.
+//!
+//! [`DartCodeGenerator`] implements [`CodeGenerator`] and is the entry point for
+//! producing a single Dart source file from a [`Registry`]. It carries
+//! It delegates writing to the emitter layer.
+
+use std::io::{Result, Write};
+
+use crate::{
+    Registry,
+    generation::{
+        CodeGenerator, CodeGeneratorConfig, Container, Emitter, indent::IndentedWriter,
+        module::Module, dart::emitter::Dart,
+    },
+    reflection::format::{Format, FormatHolder, Namespace, QualifiedTypeName},
+};
+
+/// Main configuration object for Dart code generation.
+///
+/// Wraps a [`CodeGeneratorConfig`] and implements [`CodeGenerator`] so it
+/// can be used by the installer pipeline.
+pub struct DartCodeGenerator<'a> {
+    /// Language-independent configuration.
+    pub(crate) config: &'a CodeGeneratorConfig,
+}
+
+impl<'a> CodeGenerator<'a> for DartCodeGenerator<'a> {
+    fn new(config: &'a CodeGeneratorConfig) -> Self {
+        DartCodeGenerator::new(config)
+    }
+
+    fn write_output<W: Write>(&mut self, writer: &mut W, registry: &Registry) -> Result<()> {
+        self.output(writer, registry)
+    }
+}
+
+impl<'a> DartCodeGenerator<'a> {
+    /// Create a Dart code generator for the given config.
+    #[must_use]
+    pub const fn new(config: &'a CodeGeneratorConfig) -> Self {
+        Self { config }
+    }
+
+    /// Produce a complete Dart source file for the types in `registry`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to `out` fails.
+    pub fn output(&self, out: &mut impl Write, registry: &Registry) -> Result<()> {
+        let w = &mut IndentedWriter::new(out, self.config.indent);
+
+        let mut config = self.config.clone();
+        config.update_from(registry);
+
+        let lang = Dart::new(&config, registry);
+
+        Module::new(&config).write(w, &lang)?;
+
+        let updated_registry = Self::update_qualified_names(&config, registry);
+        for container in updated_registry.iter().map(Container::from) {
+            container.write(w, &lang)?;
+        }
+
+        Ok(())
+    }
+
+    /// Updates [`QualifiedTypeName`] instances for Dart's ES-module
+    /// namespacing:
+    ///
+    /// 1. **Same-module type** — strip namespace to `Root` so it renders as a
+    ///    bare name (e.g. `Child`).
+    /// 2. **External type in different namespace** — keep its `Named` namespace,
+    ///    which renders as `Namespace.Type` (e.g. `Other.Child`) via the
+    ///    wildcard import added by the [`Module`](super::super::module::Module)
+    ///    emitter.
+    fn update_qualified_names(config: &CodeGeneratorConfig, registry: &Registry) -> Registry {
+        let mut updated_registry = registry.clone();
+
+        for container_format in updated_registry.values_mut() {
+            let _ = container_format.visit_mut(&mut |format| {
+                if let Format::TypeName(qualified_name) = format
+                    && let Namespace::Named(namespace) = &qualified_name.namespace
+                    && namespace == config.module_name()
+                {
+                    // Same-module type: strip namespace so it renders as a bare name
+                    *qualified_name = QualifiedTypeName::root(qualified_name.name.clone());
+                }
+                Ok(())
+            });
+        }
+
+        updated_registry
+    }
+}
+
+#[cfg(test)]
+mod tests;

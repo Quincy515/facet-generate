@@ -29,6 +29,9 @@ pub mod typescript;
 #[cfg(feature = "csharp")]
 pub mod csharp;
 
+#[cfg(feature = "dart")]
+pub mod dart;
+
 /// JSON serialization plugin.
 ///
 /// When added to a language tag's plugin list, it provides the

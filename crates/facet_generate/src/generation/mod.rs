@@ -52,6 +52,9 @@ pub mod swift;
 /// Support for code-generation in TypeScript
 #[cfg(feature = "typescript")]
 pub mod typescript;
+/// Support for code-generation in Dart
+#[cfg(feature = "dart")]
+pub mod dart;
 
 /// Common configuration objects and traits used in public APIs.
 mod config;

@@ -36,6 +36,9 @@ pub mod typescript;
 #[cfg(feature = "csharp")]
 pub mod csharp;
 
+#[cfg(feature = "dart")]
+pub mod dart;
+
 /// Bincode serialization plugin.
 ///
 /// A lightweight, language-agnostic plugin token. Languages that need
