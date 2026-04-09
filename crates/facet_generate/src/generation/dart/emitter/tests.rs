@@ -121,6 +121,43 @@ fn tuple_struct() {
 }
 
 #[test]
+fn struct_with_dart_reserved_word_field_names() {
+    // English: Verify Step 4 sanitize_dart_ident — Rust field names that collide
+    // with Dart reserved words must be suffixed with `_` in the generated code.
+    // Tests `class`, `with`, `default`, `switch`, `var` — all valid Rust idents
+    // but Dart reserved words.
+    // 中文:验证 Step 4 的 sanitize_dart_ident —— Rust 字段名如果撞 Dart 保留字,
+    // 生成代码里必须后缀加 `_`。测试 `class`、`with`、`default`、`switch`、`var`
+    // 这些合法 Rust 标识符但 Dart 保留字。
+    #[derive(Facet)]
+    #[allow(non_snake_case)]
+    struct WithDartKeywords {
+        class: String,
+        with: bool,
+        default: i32,
+        switch: f64,
+        var: String,
+        normal_field: String,
+    }
+
+    let actual = emit!(WithDartKeywords as Dart with Encoding::None).unwrap();
+    insta::assert_snapshot!(actual, @"
+
+
+    final class WithDartKeywords {
+        final String class_;
+        final bool with_;
+        final int default_;
+        final double switch_;
+        final String var_;
+        final String normal_field;
+
+        const WithDartKeywords({required this.class_, required this.with_, required this.default_, required this.switch_, required this.var_, required this.normal_field});
+    }
+    ");
+}
+
+#[test]
 fn struct_with_fields_of_primitive_types() {
     /// line 1
     #[derive(Facet)]
@@ -151,7 +188,7 @@ fn struct_with_fields_of_primitive_types() {
     /// line 1
     /// line 2
     final class StructWithFields {
-        final Unit unit;
+        final Null unit;
         final bool bool;
         final int i8;
         final int i16;

@@ -248,9 +248,13 @@ impl Emitter<Dart> for Format {
                     type_.format(ToUpperCamelCase::to_upper_camel_case, ".")
                 )
             }
-            // English: Rust unit has no direct Dart equivalent; we use a generated `Unit` class
-            // 中文:Rust 的 unit 类型在 Dart 中没有直接对应,使用生成的 `Unit` 类
-            Self::Unit => write!(w, "Unit"),
+            // English: Rust `()` maps to Dart `Null` — both are unit types with exactly one
+            // value (Rust's `()` and Dart's `null`). `final Null unit;` is semantically exact:
+            // the field can only hold `null`, preserving the "no information" meaning of `()`.
+            // 中文:Rust 的 `()` 映射到 Dart 的 `Null` —— 两者都是"单值类型"(Rust 的 `()`
+            // 和 Dart 的 `null` 各自只有一个值)。`final Null unit;` 语义精确:字段只能持有
+            // `null`,保留了 `()` 的"无信息"含义。
+            Self::Unit => write!(w, "Null"),
             Self::Bool => write!(w, "bool"),
             // English: Dart int is 64-bit signed; Rust i8..i64 fit cleanly, u8..u32 also fit
             //          u64 may overflow Dart int above 2^63 — accepted limitation in v1
@@ -316,7 +320,43 @@ impl Emitter<Dart> for Named<Format> {
         // 中文:Dart 字段声明 —— `final <类型> <字段名>`(类型在前,和 TS 相反)
         write!(w, "final ")?;
         self.value.write(w, lang)?;
-        write!(w, " {}", &self.name)
+        write!(w, " {}", sanitize_dart_ident(&self.name))
+    }
+}
+
+/// Sanitize a field name against Dart reserved words and built-in identifiers.
+///
+/// English: Dart has a set of reserved words (`class`, `final`, `const`, `is`,
+/// `as`, `in`, `switch`, etc.) and built-in identifiers that cannot be used as
+/// variable names. If the Rust source type has a field with a name colliding
+/// with one of these, we suffix it with `_` to make it a valid Dart identifier.
+/// This is a minimal conservative list — Dart's full keyword list is longer
+/// but most keywords are not plausible Rust field names.
+///
+/// 中文:Dart 有一组保留字(`class`、`final`、`const`、`is`、`as`、`in`、
+/// `switch` 等)和内置标识符,不能直接用作变量名。如果 Rust 源类型有字段名
+/// 和这些冲突,后缀加 `_` 使其成为合法 Dart 标识符。这里保留的是一个最小
+/// 的保守列表——Dart 的完整关键字列表更长,但大多数不太可能出现在 Rust
+/// 字段名里。
+fn sanitize_dart_ident(name: &str) -> String {
+    // Conservative list of Dart reserved words and built-ins that are plausible
+    // as Rust field names. Dart identifiers can contain `$` and start with `_`,
+    // but an `_` prefix makes the field library-private — not what we want. So
+    // we suffix with `_` instead.
+    const DART_RESERVED: &[&str] = &[
+        "abstract", "as", "assert", "async", "await", "break", "case", "catch",
+        "class", "const", "continue", "covariant", "default", "deferred", "do",
+        "dynamic", "else", "enum", "export", "extends", "extension", "external",
+        "factory", "false", "final", "finally", "for", "function", "get", "hide",
+        "if", "implements", "import", "in", "interface", "is", "late", "library",
+        "mixin", "new", "null", "of", "on", "operator", "part", "rethrow", "return",
+        "sealed", "set", "show", "static", "super", "switch", "sync", "this",
+        "throw", "true", "try", "typedef", "var", "void", "while", "with", "yield",
+    ];
+    if DART_RESERVED.contains(&name) {
+        format!("{name}_")
+    } else {
+        name.to_string()
     }
 }
 
@@ -387,6 +427,10 @@ fn output_struct_or_variant<W: IndentWrite>(
         name.to_string()
     };
 
+    // English: Constructor parameters reference sanitized field names so they
+    // match the field declarations above (which also go through sanitize_dart_ident).
+    // 中文:构造器参数引用 sanitize 后的字段名,以和上面的字段声明保持一致
+    // (字段声明也通过 sanitize_dart_ident 处理)。
     match layout {
         FieldLayout::Unit => {
             writeln!(w, "const {class_name}();")?;
@@ -394,14 +438,14 @@ fn output_struct_or_variant<W: IndentWrite>(
         FieldLayout::Positional => {
             let params: Vec<String> = fields
                 .iter()
-                .map(|f| format!("this.{}", &f.name))
+                .map(|f| format!("this.{}", sanitize_dart_ident(&f.name)))
                 .collect();
             writeln!(w, "const {class_name}({});", params.join(", "))?;
         }
         FieldLayout::Named => {
             let params: Vec<String> = fields
                 .iter()
-                .map(|f| format!("required this.{}", &f.name))
+                .map(|f| format!("required this.{}", sanitize_dart_ident(&f.name)))
                 .collect();
             writeln!(w, "const {class_name}({{{}}});", params.join(", "))?;
         }
