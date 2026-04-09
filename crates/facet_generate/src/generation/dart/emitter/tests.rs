@@ -895,7 +895,7 @@ fn type_in_root_and_named_namespace() {
     }
     ");
     insta::assert_snapshot!(root, @"
-    import '../other.dart' as Other;
+    import 'other.dart' as Other;
 
     final class Child {
         final String value;

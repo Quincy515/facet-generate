@@ -15,7 +15,7 @@
 //! | Nested complex types | `Option<Seq<TypeName>>` — namespace stripping recurses into nested formats |
 //! | Enum variants | Variant payloads containing `TypeName` are updated correctly |
 //! | Immutability | `update_qualified_names` does not mutate the input registry |
-//! | Import generation | Relative (`../namespace`), external package paths, `module_name` sub-paths, URL packages |
+//! | Import generation | Sibling (`namespace`), external package paths, `module_name` sub-paths, URL packages |
 //! | Priority | External packages override relative imports for the same namespace |
 //! | Deserialization | Qualified names appear correctly in `deserialize` call sites |
 
@@ -227,7 +227,7 @@ fn output_adds_import_for_external_namespace() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import '../other.dart' as Other;"#));
+    assert!(output.contains(r#"import 'other.dart' as Other;"#));
 }
 
 #[test]
@@ -239,7 +239,7 @@ fn output_does_not_import_current_module() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(!output.contains(r#"import '../root.dart' as Root;"#));
+    assert!(!output.contains(r#"import 'root.dart' as Root;"#));
 }
 
 #[test]
@@ -262,7 +262,7 @@ fn output_uses_external_package_path_for_namespace() {
 
     let output = render_output(&config, &registry);
     assert!(output.contains(r#"import 'shared-types.dart' as Other;"#));
-    assert!(!output.contains(r#"import '../other.dart' as Other;"#));
+    assert!(!output.contains(r#"import 'other.dart' as Other;"#));
 }
 
 #[test]
@@ -335,7 +335,7 @@ fn output_external_package_takes_priority_over_relative_import() {
 
     let output = render_output(&config, &registry);
     assert!(output.contains(r#"import 'shared-types.dart' as Other;"#));
-    assert!(!output.contains(r#"import '../other.dart' as Other;"#));
+    assert!(!output.contains(r#"import 'other.dart' as Other;"#));
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn output_falls_back_to_relative_import_without_external_package() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import '../legacy.dart' as Legacy;"#));
+    assert!(output.contains(r#"import 'legacy.dart' as Legacy;"#));
 }
 
 #[test]

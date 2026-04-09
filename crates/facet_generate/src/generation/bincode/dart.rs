@@ -64,14 +64,19 @@ use super::BincodePlugin;
 impl EmitterPlugin<Dart> for BincodePlugin {
     fn module_helpers(
         &self,
-        _w: &mut dyn IndentWrite,
+        w: &mut dyn IndentWrite,
         _config: &CodeGeneratorConfig,
     ) -> io::Result<()> {
-        // English: No top-level helper functions needed. d_bincode's API is
-        // direct and Dart's inline `for` loops / null checks are concise enough
-        // that we emit per-field encode/decode code inline inside each class.
-        // 中文:不需要顶层辅助函数。d_bincode 的 API 是直接风格,Dart 的 inline
-        // for 循环和 null 检查足够简洁,我们在每个类内部内联 encode/decode 代码。
+        // English: Every generated class references `BincodeWriter` /
+        // `BincodeReader` from the `d_bincode` package. We emit a single
+        // top-level import so downstream `dart analyze` can resolve them.
+        // Per-field encode/decode code remains inline inside each class
+        // (d_bincode's API is direct enough that no helper functions needed).
+        // 中文:所有生成的 class 都引用 d_bincode 包的 `BincodeWriter` /
+        // `BincodeReader`,这里统一 emit 一行顶层 import,下游 `dart analyze`
+        // 才能解析它们。每个字段的 encode/decode 代码仍在 class 内部内联
+        // (d_bincode 的 API 足够直接,不需要辅助函数)。
+        writeln!(w, "import 'package:d_bincode/d_bincode.dart';")?;
         Ok(())
     }
 

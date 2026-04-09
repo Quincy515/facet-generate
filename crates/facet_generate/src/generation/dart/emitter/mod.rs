@@ -107,7 +107,13 @@ impl Module {
 
     fn dart_namespace_import_path(&self, namespace: &str) -> String {
         self.config().external_packages.get(namespace).map_or_else(
-            || format!("../{namespace}"),
+            // English: Sibling modules live in the same `lib/` directory
+            // (`lib/<root>.dart` and `lib/<namespace>.dart`), so the import
+            // path is just the bare namespace name — no `../` prefix.
+            // 中文:同级模块都在 `lib/` 目录下(`lib/<root>.dart` 和
+            // `lib/<namespace>.dart`),所以 import 路径就是裸的命名空间名,
+            // 不需要 `../` 前缀。
+            || namespace.to_string(),
             |path| match &path.location {
                 PackageLocation::Path(_) => {
                     let name = &path.for_namespace;
@@ -135,8 +141,8 @@ impl Emitter<Dart> for Module {
             writeln!(w, "import 'dart:typed_data';")?;
         }
 
-        // English: Namespace imports — Dart `import '../foo.dart' as Foo;`
-        // 中文:跨命名空间 import —— Dart 用 `import '../foo.dart' as Foo;`
+        // English: Namespace imports — Dart `import 'foo.dart' as Foo;`
+        // 中文:跨命名空间 import —— Dart 用 `import 'foo.dart' as Foo;`
         let mut import_paths: BTreeMap<String, String> = BTreeMap::new();
         for namespace in referenced_namespaces {
             let import_path = self.dart_namespace_import_path(namespace);

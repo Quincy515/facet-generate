@@ -155,10 +155,22 @@ impl Installer {
         out.push_str("environment:\n");
         out.push_str("  sdk: ^3.5.0\n");
 
-        // Add dependencies if we have external packages
-        if !self.external_packages.is_empty() {
+        // English: When bincode encoding is active, the generated classes
+        // reference `BincodeWriter` / `BincodeReader` from the `d_bincode`
+        // package. We emit a path dependency pointing at a sibling `d_bincode`
+        // directory under the install root; consumers vendor d_bincode there.
+        // 中文:bincode 编码激活时,生成的类会引用 d_bincode 包的 BincodeWriter /
+        // BincodeReader。我们在 pubspec 里声明一个 path 依赖,指向安装根目录下的
+        // 同级 `d_bincode/` 目录,消费方在那里 vendor d_bincode。
+        let need_d_bincode = self.encoding == Encoding::Bincode;
+
+        if !self.external_packages.is_empty() || need_d_bincode {
             out.push('\n');
             out.push_str("dependencies:\n");
+            if need_d_bincode {
+                out.push_str("  d_bincode:\n");
+                out.push_str("    path: ./d_bincode\n");
+            }
 
             // English: Sort by namespace name for stable output (BTreeMap iteration is
             // already sorted, but ExternalPackages is a HashMap-like — be safe).
