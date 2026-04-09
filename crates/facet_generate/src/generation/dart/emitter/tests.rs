@@ -34,56 +34,10 @@ use facet::Facet;
 use super::*;
 use crate::{emit, emit_two_modules, generation::dart::DartCodeGenerator};
 
-#[test]
-fn test_format_type_aliases() {
-    let input = BTreeSet::from([
-        "bool".to_string(),
-        "bytes".to_string(),
-        "char".to_string(),
-        "float32".to_string(),
-        "float64".to_string(),
-        "int128".to_string(),
-        "int16".to_string(),
-        "int32".to_string(),
-        "int64".to_string(),
-        "int8".to_string(),
-        "list_tuple".to_string(),
-        "option".to_string(),
-        "seq".to_string(),
-        "str".to_string(),
-        "tuple".to_string(),
-        "uint128".to_string(),
-        "uint16".to_string(),
-        "uint32".to_string(),
-        "uint64".to_string(),
-        "uint8".to_string(),
-        "unit".to_string(),
-    ]);
-    let actual = format_type_aliases(&input);
-    insta::assert_snapshot!(&actual, @"
-    type bool = boolean;
-    type bytes = Uint8Array;
-    type char = string;
-    type float32 = number;
-    type float64 = number;
-    type int128 = bigint;
-    type int16 = number;
-    type int32 = number;
-    type int64 = bigint;
-    type int8 = number;
-    type ListTuple<T extends any[]> = Tuple<T>[];
-    type Optional<T> = T | null;
-    type Seq<T> = T[];
-    type str = string;
-    type Tuple<T extends any[]> = T;
-    type uint128 = bigint;
-    type uint16 = number;
-    type uint32 = number;
-    type uint64 = bigint;
-    type uint8 = number;
-    type unit = null;
-    ");
-}
+// English: test_format_type_aliases removed — Dart doesn't use TYPE_ALIASES
+// (native int/bool/double/String/List/Map/T? types cover everything).
+// 中文:test_format_type_aliases 测试删除 —— Dart 不用 TYPE_ALIASES(原生类型
+// 已经涵盖所有需求)。
 
 #[test]
 fn unit_struct() {
@@ -98,9 +52,8 @@ fn unit_struct() {
 
     /// line 1
     /// line 2
-    export class UnitStruct {
-        constructor () {
-        }
+    final class UnitStruct {
+        const UnitStruct();
     }
     ");
 }
@@ -118,9 +71,8 @@ fn unit_struct_empty_body() {
 
     /// line 1
     /// line 2
-    export class UnitStruct {
-        constructor () {
-        }
+    final class UnitStruct {
+        const UnitStruct();
     }
     ");
 }
@@ -138,9 +90,10 @@ fn newtype_struct() {
 
     /// line 1
     /// line 2
-    export class NewType {
-        constructor (public value: str) {
-        }
+    final class NewType {
+        final String value;
+
+        const NewType(this.value);
     }
     ");
 }
@@ -158,9 +111,11 @@ fn tuple_struct() {
 
     /// line 1
     /// line 2
-    export class TupleStruct {
-        constructor (public field0: str, public field1: int32) {
-        }
+    final class TupleStruct {
+        final String field0;
+        final int field1;
+
+        const TupleStruct(this.field0, this.field1);
     }
     ");
 }
@@ -195,9 +150,25 @@ fn struct_with_fields_of_primitive_types() {
 
     /// line 1
     /// line 2
-    export class StructWithFields {
-        constructor (public unit: unit, public bool: bool, public i8: int8, public i16: int16, public i32: int32, public i64: int64, public i128: int128, public u8: uint8, public u16: uint16, public u32: uint32, public u64: uint64, public u128: uint128, public f32: float32, public f64: float64, public char: char, public string: str) {
-        }
+    final class StructWithFields {
+        final Unit unit;
+        final bool bool;
+        final int i8;
+        final int i16;
+        final int i32;
+        final int i64;
+        final BigInt i128;
+        final int u8;
+        final int u16;
+        final int u32;
+        final int u64;
+        final BigInt u128;
+        final double f32;
+        final double f64;
+        final String char;
+        final String string;
+
+        const StructWithFields({required this.unit, required this.bool, required this.i8, required this.i16, required this.i32, required this.i64, required this.i128, required this.u8, required this.u16, required this.u32, required this.u64, required this.u128, required this.f32, required this.f64, required this.char, required this.string});
     }
     ");
 }
@@ -226,27 +197,34 @@ fn struct_with_fields_of_user_types() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class Inner1 {
-        constructor (public field1: str) {
-        }
+    final class Inner1 {
+        final String field1;
+
+        const Inner1({required this.field1});
     }
 
 
-    export class Inner2 {
-        constructor (public value: str) {
-        }
+    final class Inner2 {
+        final String value;
+
+        const Inner2(this.value);
     }
 
 
-    export class Inner3 {
-        constructor (public field0: str, public field1: int32) {
-        }
+    final class Inner3 {
+        final String field0;
+        final int field1;
+
+        const Inner3(this.field0, this.field1);
     }
 
 
-    export class Outer {
-        constructor (public one: Inner1, public two: Inner2, public three: Inner3) {
-        }
+    final class Outer {
+        final Inner1 one;
+        final Inner2 two;
+        final Inner3 three;
+
+        const Outer({required this.one, required this.two, required this.three});
     }
     ");
 }
@@ -262,9 +240,10 @@ fn struct_with_field_that_is_a_2_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32]>) {
-        }
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
     }
     ");
 }
@@ -280,9 +259,10 @@ fn struct_with_field_that_is_a_3_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32, uint16]>) {
-        }
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
     }
     ");
 }
@@ -298,9 +278,10 @@ fn struct_with_field_that_is_a_4_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32, uint16, float32]>) {
-        }
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
     }
     ");
 }
@@ -327,28 +308,8 @@ fn enum_with_unit_variants() {
 
     /// line one
     /// line two
-    export abstract class EnumWithUnitVariants {
-    }
-
-    /// variant one
-    export class EnumWithUnitVariantsVariantVariant1 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
-    }
-
-    /// variant two
-    export class EnumWithUnitVariantsVariantVariant2 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
-    }
-
-    /// variant three
-    export class EnumWithUnitVariantsVariantVariant3 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
+    enum EnumWithUnitVariants {
+        Variant1, Variant2, Variant3;
     }
     ");
 }
@@ -368,13 +329,8 @@ fn enum_with_unit_struct_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-    }
-
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor () {
-            super();
-        }
+    enum MyEnum {
+        Variant1;
     }
     ");
 }
@@ -392,13 +348,14 @@ fn enum_with_1_tuple_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
+    sealed class MyEnum {
+        const MyEnum();
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String value;
+
+        const MyEnumVariantVariant1(this.value);
     }
     ");
 }
@@ -417,19 +374,20 @@ fn enum_with_newtype_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
+    sealed class MyEnum {
+        const MyEnum();
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String value;
+
+        const MyEnumVariantVariant1(this.value);
     }
 
-    export class MyEnumVariantVariant2 extends MyEnum {
-        constructor (public value: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant2 extends MyEnum {
+        final int value;
+
+        const MyEnumVariantVariant2(this.value);
     }
     ");
 }
@@ -448,19 +406,23 @@ fn enum_with_tuple_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
+    sealed class MyEnum {
+        const MyEnum();
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public field0: str, public field1: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String field0;
+        final int field1;
+
+        const MyEnumVariantVariant1(this.field0, this.field1);
     }
 
-    export class MyEnumVariantVariant2 extends MyEnum {
-        constructor (public field0: bool, public field1: float64, public field2: uint8) {
-            super();
-        }
+    final class MyEnumVariantVariant2 extends MyEnum {
+        final bool field0;
+        final double field1;
+        final int field2;
+
+        const MyEnumVariantVariant2(this.field0, this.field1, this.field2);
     }
     ");
 }
@@ -478,13 +440,15 @@ fn enum_with_struct_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
+    sealed class MyEnum {
+        const MyEnum();
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public field1: str, public field2: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String field1;
+        final int field2;
+
+        const MyEnumVariantVariant1({required this.field1, required this.field2});
     }
     ");
 }
@@ -505,31 +469,31 @@ fn enum_with_mixed_variants() {
     insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
+    sealed class MyEnum {
+        const MyEnum();
     }
 
-    export class MyEnumVariantUnit extends MyEnum {
-        constructor () {
-            super();
-        }
+    final class MyEnumVariantUnit extends MyEnum {
+        const MyEnumVariantUnit();
     }
 
-    export class MyEnumVariantNewType extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantNewType extends MyEnum {
+        final String value;
+
+        const MyEnumVariantNewType(this.value);
     }
 
-    export class MyEnumVariantTuple extends MyEnum {
-        constructor (public field0: str, public field1: int32) {
-            super();
-        }
+    final class MyEnumVariantTuple extends MyEnum {
+        final String field0;
+        final int field1;
+
+        const MyEnumVariantTuple(this.field0, this.field1);
     }
 
-    export class MyEnumVariantStruct extends MyEnum {
-        constructor (public field: bool) {
-            super();
-        }
+    final class MyEnumVariantStruct extends MyEnum {
+        final bool field;
+
+        const MyEnumVariantStruct({required this.field});
     }
     ");
 }
@@ -547,9 +511,12 @@ fn struct_with_vec_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public items: Seq<str>, public numbers: Seq<int32>, public nested_items: Seq<Seq<str>>) {
-        }
+    final class MyStruct {
+        final List<String> items;
+        final List<int> numbers;
+        final List<List<String>> nested_items;
+
+        const MyStruct({required this.items, required this.numbers, required this.nested_items});
     }
     ");
 }
@@ -568,9 +535,12 @@ fn struct_with_option_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public optional_string: Optional<str>, public optional_number: Optional<int32>, public optional_bool: Optional<bool>) {
-        }
+    final class MyStruct {
+        final String? optional_string;
+        final int? optional_number;
+        final bool? optional_bool;
+
+        const MyStruct({required this.optional_string, required this.optional_number, required this.optional_bool});
     }
     ");
 }
@@ -587,9 +557,11 @@ fn struct_with_hashmap_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_to_int: Map<str,int32>, public int_to_bool: Map<int32,bool>) {
-        }
+    final class MyStruct {
+        final Map<String, int> string_to_int;
+        final Map<int, bool> int_to_bool;
+
+        const MyStruct({required this.string_to_int, required this.int_to_bool});
     }
     ");
 }
@@ -609,9 +581,14 @@ fn struct_with_nested_generics() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public optional_list: Optional<Seq<str>>, public list_of_optionals: Seq<Optional<int32>>, public map_to_list: Map<str,Seq<bool>>, public optional_map: Optional<Map<str,int32>>, public complex: Seq<Optional<Map<str,Seq<bool>>>>) {
-        }
+    final class MyStruct {
+        final List<String>? optional_list;
+        final List<int?> list_of_optionals;
+        final Map<String, List<bool>> map_to_list;
+        final Map<String, int>? optional_map;
+        final List<Map<String, List<bool>>?> complex;
+
+        const MyStruct({required this.optional_list, required this.list_of_optionals, required this.map_to_list, required this.optional_map, required this.complex});
     }
     ");
 }
@@ -630,9 +607,12 @@ fn struct_with_array_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public fixed_array: ListTuple<[int32]>, public byte_array: ListTuple<[uint8]>, public string_array: ListTuple<[str]>) {
-        }
+    final class MyStruct {
+        final List<int> fixed_array;
+        final List<int> byte_array;
+        final List<String> string_array;
+
+        const MyStruct({required this.fixed_array, required this.byte_array, required this.string_array});
     }
     ");
 }
@@ -649,9 +629,11 @@ fn struct_with_btreemap_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_to_int: Map<str,int32>, public int_to_bool: Map<int32,bool>) {
-        }
+    final class MyStruct {
+        final Map<String, int> string_to_int;
+        final Map<int, bool> int_to_bool;
+
+        const MyStruct({required this.string_to_int, required this.int_to_bool});
     }
     ");
 }
@@ -668,9 +650,11 @@ fn struct_with_hashset_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_set: Seq<str>, public int_set: Seq<int32>) {
-        }
+    final class MyStruct {
+        final List<String> string_set;
+        final List<int> int_set;
+
+        const MyStruct({required this.string_set, required this.int_set});
     }
     ");
 }
@@ -687,9 +671,11 @@ fn struct_with_btreeset_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_set: Seq<str>, public int_set: Seq<int32>) {
-        }
+    final class MyStruct {
+        final List<String> string_set;
+        final List<int> int_set;
+
+        const MyStruct({required this.string_set, required this.int_set});
     }
     ");
 }
@@ -707,9 +693,11 @@ fn struct_with_box_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public boxed_string: str, public boxed_int: int32) {
-        }
+    final class MyStruct {
+        final String boxed_string;
+        final int boxed_int;
+
+        const MyStruct({required this.boxed_string, required this.boxed_int});
     }
     ");
 }
@@ -726,9 +714,11 @@ fn struct_with_rc_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public rc_string: str, public rc_int: int32) {
-        }
+    final class MyStruct {
+        final String rc_string;
+        final int rc_int;
+
+        const MyStruct({required this.rc_string, required this.rc_int});
     }
     ");
 }
@@ -745,9 +735,11 @@ fn struct_with_arc_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public arc_string: str, public arc_int: int32) {
-        }
+    final class MyStruct {
+        final String arc_string;
+        final int arc_int;
+
+        const MyStruct({required this.arc_string, required this.arc_int});
     }
     ");
 }
@@ -768,9 +760,14 @@ fn struct_with_mixed_collections_and_pointers() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public vec_of_sets: Seq<Seq<str>>, public optional_btree: Optional<Map<str,int32>>, public boxed_vec: Seq<str>, public arc_option: Optional<str>, public array_of_boxes: ListTuple<[int32]>) {
-        }
+    final class MyStruct {
+        final List<List<String>> vec_of_sets;
+        final Map<String, int>? optional_btree;
+        final List<String> boxed_vec;
+        final String? arc_option;
+        final List<int> array_of_boxes;
+
+        const MyStruct({required this.vec_of_sets, required this.optional_btree, required this.boxed_vec, required this.arc_option, required this.array_of_boxes});
     }
     ");
 }
@@ -790,9 +787,12 @@ fn struct_with_bytes_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public data: bytes, public name: str, public header: bytes) {
-        }
+    final class MyStruct {
+        final Uint8List data;
+        final String name;
+        final Uint8List header;
+
+        const MyStruct({required this.data, required this.name, required this.header});
     }
     ");
 }
@@ -813,9 +813,13 @@ fn struct_with_bytes_field_and_slice() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public data: bytes, public name: str, public header: bytes, public optional_bytes: Optional<Seq<uint8>>) {
-        }
+    final class MyStruct {
+        final Uint8List data;
+        final String name;
+        final Uint8List header;
+        final List<int>? optional_bytes;
+
+        const MyStruct({required this.data, required this.name, required this.header, required this.optional_bytes});
     }
     ");
 }
@@ -846,25 +850,27 @@ fn type_in_root_and_named_namespace() {
 
     let (other, root) = emit_two_modules!(DartCodeGenerator, Parent, "root");
     insta::assert_snapshot!(other, @"
-    type int32 = number;
 
-    export class Child {
-        constructor (public value: int32) {
-        }
+    final class Child {
+        final int value;
+
+        const Child({required this.value});
     }
     ");
-    insta::assert_snapshot!(root, @r#"
-    import * as Other from "../other";
-    type str = string;
+    insta::assert_snapshot!(root, @"
+    import '../other.dart' as Other;
 
-    export class Child {
-        constructor (public value: str) {
-        }
+    final class Child {
+        final String value;
+
+        const Child({required this.value});
     }
 
-    export class Parent {
-        constructor (public child: Child, public other_child: Other.Child) {
-        }
+    final class Parent {
+        final Child child;
+        final Other.Child other_child;
+
+        const Parent({required this.child, required this.other_child});
     }
-    "#);
+    ");
 }

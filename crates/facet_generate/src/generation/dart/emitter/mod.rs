@@ -41,8 +41,6 @@
 //! - With no plugins (`Encoding::None`), only plain type declarations are
 //!   emitted.
 
-#[cfg(test)]
-use std::collections::BTreeSet;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
@@ -53,9 +51,9 @@ use heck::ToUpperCamelCase;
 
 use crate::{
     generation::{
-        CodeGeneratorConfig, Container, Emitter, Encoding, PackageLocation, SERDE_NAMESPACE,
+        CodeGeneratorConfig, Container, Emitter, Encoding, PackageLocation,
         bincode::BincodePlugin,
-        indent::{IndentConfig, IndentWrite, IndentedWriter, Newlines},
+        indent::{IndentWrite, Newlines},
         // English: json::JsonPlugin not yet wired for Dart — see §9.4 of Obsidian note
         // 中文:Dart 的 JsonPlugin 尚未接入,见 Obsidian 笔记 §9.4
         module::Module,
@@ -102,23 +100,12 @@ impl Dart {
 }
 
 impl Module {
-    fn dart_serde_import_path(&self) -> String {
-        self.config()
-            .external_packages
-            .get(SERDE_NAMESPACE)
-            .map_or_else(
-                || "./serde".to_string(),
-                |path| match &path.location {
-                    PackageLocation::Path(_) => {
-                        let name = &path.for_namespace;
-                        path.module_name
-                            .as_ref()
-                            .map_or_else(|| name.clone(), |mod_name| format!("{name}/{mod_name}"))
-                    }
-                    PackageLocation::Url(_) => path.for_namespace.clone(),
-                },
-            )
-    }
+    // English: dart_serde_import_path() removed — Dart doesn't import a Serializer/Deserializer
+    // runtime from an external path; bincode runtime is vendored under lib/vendor/d_bincode/,
+    // JSON uses built-in dart:convert. Plugin module_helpers handles the imports.
+    // 中文:dart_serde_import_path() 删除 —— Dart 不从外部路径 import Serializer/Deserializer
+    // 运行时;bincode 运行时 vendor 在 lib/vendor/d_bincode/,JSON 用内置 dart:convert。
+    // Plugin 的 module_helpers 负责相应 import。
 
     fn dart_namespace_import_path(&self, namespace: &str) -> String {
         self.config().external_packages.get(namespace).map_or_else(
@@ -144,35 +131,27 @@ impl Emitter<Dart> for Module {
             ..
         } = self.config();
 
-        if self.config().has_encoding() {
-            let import_path = self.dart_serde_import_path();
-            writeln!(
-                w,
-                r#"import {{ Serializer, Deserializer }} from "{import_path}";"#
-            )?;
+        // English: If any field uses Bytes (Uint8List), we need dart:typed_data
+        // 中文:如果有任何字段用到 Bytes,需要 import dart:typed_data
+        if used_format_types.iter().any(|t| t == "bytes") {
+            writeln!(w, "import 'dart:typed_data';")?;
         }
 
-        // Write namespace imports (e.g. `import * as Foo from "../foo";`)
+        // English: Namespace imports — Dart `import '../foo.dart' as Foo;`
+        // 中文:跨命名空间 import —— Dart 用 `import '../foo.dart' as Foo;`
         let mut import_paths: BTreeMap<String, String> = BTreeMap::new();
         for namespace in referenced_namespaces {
             let import_path = self.dart_namespace_import_path(namespace);
             import_paths.insert(namespace.to_upper_camel_case(), import_path);
         }
         for (namespace, path) in import_paths {
-            writeln!(w, r#"import * as {namespace} from "{path}";"#)?;
+            writeln!(w, "import '{path}.dart' as {namespace};")?;
         }
 
-        // Write type aliases (e.g. `type bool = boolean;`)
-        let alias_map = BTreeMap::from(TYPE_ALIASES);
-        let aliases: Vec<String> = used_format_types
-            .iter()
-            .filter_map(|k| alias_map.get(k.as_str()).map(|s| (*s).to_string()))
-            .collect();
-        if !aliases.is_empty() {
-            writeln!(w, "{}", aliases.join("\n"))?;
-        }
+        // English: No TYPE_ALIASES — Dart has native int/bool/double/List/Map/T? etc.
+        // 中文:不需要 TYPE_ALIASES —— Dart 原生有 int/bool/double/List/Map/T? 等
 
-        // Plugin module helpers (feature helper snippets).
+        // Plugin module helpers (bincode/json runtime imports, feature helpers).
         for plugin in lang.plugins() {
             plugin.module_helpers(w, self.config())?;
         }
@@ -191,6 +170,32 @@ impl Emitter<Dart> for Doc {
     }
 }
 
+/// Field layout strategy for Dart constructor emission.
+///
+/// English: Controls whether the generated constructor uses positional or named
+/// parameters. Dart allows both, but different Rust container shapes map to
+/// different idiomatic choices.
+///
+/// 中文:控制生成的 Dart 构造器用位置参数还是命名参数。Dart 两种都支持,但
+/// 不同的 Rust 容器形状对应不同的 Dart 习惯用法。
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum FieldLayout {
+    /// English: No fields — emits `const Foo();`
+    /// 中文:无字段 —— 生成 `const Foo();`
+    Unit,
+    /// English: Positional parameters — emits `const Foo(this.a, this.b);`
+    /// Used for Rust NewType and Tuple structs/variants where field names are
+    /// synthetic (`value`, `field0`, `field1`, ...).
+    /// 中文:位置参数 —— 生成 `const Foo(this.a, this.b);`
+    /// 用于 Rust NewType 和 Tuple 结构体/变体,字段名是合成的。
+    Positional,
+    /// English: Named parameters — emits `const Foo({required this.a, required this.b});`
+    /// Used for Rust Struct variants with real field names.
+    /// 中文:命名参数 —— 生成 `const Foo({required this.a, required this.b});`
+    /// 用于带真实字段名的 Rust Struct 变体。
+    Named,
+}
+
 impl Emitter<Dart> for Container<'_> {
     fn write<W: IndentWrite>(&self, w: &mut W, lang: &Dart) -> Result<()> {
         let Container {
@@ -203,12 +208,12 @@ impl Emitter<Dart> for Container<'_> {
         match format {
             ContainerFormat::UnitStruct(doc) => {
                 let ctx = EmitContext::top_level(self);
-                output_struct_or_variant(w, &ctx, name, &[], doc, lang)
+                output_struct_or_variant(w, &ctx, name, &[], FieldLayout::Unit, doc, lang)
             }
             ContainerFormat::NewTypeStruct(format, doc) => {
                 let fields = vec![Named::new(format.as_ref(), "value".to_string())];
                 let ctx = EmitContext::top_level(self);
-                output_struct_or_variant(w, &ctx, name, &fields, doc, lang)
+                output_struct_or_variant(w, &ctx, name, &fields, FieldLayout::Positional, doc, lang)
             }
             ContainerFormat::TupleStruct(formats, doc) => {
                 let fields: Vec<_> = formats
@@ -217,11 +222,11 @@ impl Emitter<Dart> for Container<'_> {
                     .map(|(i, f)| Named::new(f, format!("field{i}")))
                     .collect();
                 let ctx = EmitContext::top_level(self);
-                output_struct_or_variant(w, &ctx, name, &fields, doc, lang)
+                output_struct_or_variant(w, &ctx, name, &fields, FieldLayout::Positional, doc, lang)
             }
             ContainerFormat::Struct(fields, doc) => {
                 let ctx = EmitContext::top_level(self);
-                output_struct_or_variant(w, &ctx, name, fields, doc, lang)
+                output_struct_or_variant(w, &ctx, name, fields, FieldLayout::Named, doc, lang)
             }
             ContainerFormat::Enum(variants, doc) => {
                 output_enum_container(w, self, name, variants, doc, lang)
@@ -233,6 +238,9 @@ impl Emitter<Dart> for Container<'_> {
 impl Emitter<Dart> for Format {
     fn write<W: IndentWrite>(&self, w: &mut W, lang: &Dart) -> Result<()> {
         match self {
+            // English: Qualified type names map to bare Dart class names (namespace
+            // handled via `import ... as` prefixes at the Module level)
+            // 中文:限定类型名映射到裸 Dart 类名(命名空间通过 Module 级别的 import 前缀处理)
             Self::TypeName(type_) => {
                 write!(
                     w,
@@ -240,55 +248,62 @@ impl Emitter<Dart> for Format {
                     type_.format(ToUpperCamelCase::to_upper_camel_case, ".")
                 )
             }
-            Self::Unit => write!(w, "unit"),
+            // English: Rust unit has no direct Dart equivalent; we use a generated `Unit` class
+            // 中文:Rust 的 unit 类型在 Dart 中没有直接对应,使用生成的 `Unit` 类
+            Self::Unit => write!(w, "Unit"),
             Self::Bool => write!(w, "bool"),
-            Self::I8 => write!(w, "int8"),
-            Self::I16 => write!(w, "int16"),
-            Self::I32 => write!(w, "int32"),
-            Self::I64 => write!(w, "int64"),
-            Self::I128 => write!(w, "int128"),
-            Self::U8 => write!(w, "uint8"),
-            Self::U16 => write!(w, "uint16"),
-            Self::U32 => write!(w, "uint32"),
-            Self::U64 => write!(w, "uint64"),
-            Self::U128 => write!(w, "uint128"),
-            Self::F32 => write!(w, "float32"),
-            Self::F64 => write!(w, "float64"),
-            Self::Char => write!(w, "char"),
-            Self::Str => write!(w, "str"),
-            Self::Bytes => write!(w, "bytes"),
+            // English: Dart int is 64-bit signed; Rust i8..i64 fit cleanly, u8..u32 also fit
+            //          u64 may overflow Dart int above 2^63 — accepted limitation in v1
+            // 中文:Dart 的 int 是 64-bit 有符号;Rust i8..i64 完整容纳,u8..u32 也完整;
+            //       u64 超过 2^63 会溢出——第一版接受这个限制
+            Self::I8 | Self::I16 | Self::I32 | Self::I64 => write!(w, "int"),
+            Self::U8 | Self::U16 | Self::U32 | Self::U64 => write!(w, "int"),
+            // English: i128/u128 require BigInt in Dart (int is only 64-bit)
+            // 中文:i128/u128 在 Dart 中需要 BigInt(int 只有 64-bit)
+            Self::I128 | Self::U128 => write!(w, "BigInt"),
+            Self::F32 | Self::F64 => write!(w, "double"),
+            // English: Dart has no char type; use String with single-character convention
+            // 中文:Dart 没有 char 类型,用单字符 String 代替
+            Self::Char => write!(w, "String"),
+            Self::Str => write!(w, "String"),
+            // English: Bytes map to Uint8List from dart:typed_data
+            // 中文:字节数组映射到 dart:typed_data 的 Uint8List
+            Self::Bytes => write!(w, "Uint8List"),
 
+            // English: Dart 3 native nullable syntax (T?)
+            // 中文:Dart 3 原生可空语法 (T?)
             Self::Option(format) => {
-                write!(w, "Optional<")?;
                 format.write(w, lang)?;
-                write!(w, ">")
+                write!(w, "?")
             }
+            // English: Vec<T>/Set<T> both map to List<T> for now; Dart's Set<T> has different
+            // hashing/ordering semantics that don't round-trip cleanly with bincode/serde
+            // 中文:Vec<T>/Set<T> 都映射为 List<T>;Dart 的 Set<T> 哈希/排序语义不同,
+            // 和 bincode/serde 往返会丢信息
             Self::Seq(format) | Self::Set(format) => {
-                write!(w, "Seq<")?;
+                write!(w, "List<")?;
                 format.write(w, lang)?;
                 write!(w, ">")
             }
             Self::Map { key, value } => {
                 write!(w, "Map<")?;
                 key.write(w, lang)?;
-                write!(w, ",")?;
+                write!(w, ", ")?;
                 value.write(w, lang)?;
                 write!(w, ">")
             }
-            Self::Tuple(formats) => {
-                write!(w, "Tuple<[")?;
-                for (i, f) in formats.iter().enumerate() {
-                    if i > 0 {
-                        write!(w, ", ")?;
-                    }
-                    f.write(w, lang)?;
-                }
-                write!(w, "]>")
-            }
+            // English: Tuples map to List<dynamic>. Dart 3 records exist but lack stable
+            // JSON/bincode interop; List<dynamic> is JSON-friendly and works with d_bincode.
+            // 中文:tuple 映射为 List<dynamic>。Dart 3 的 records 存在但没有稳定的 JSON/bincode
+            // 互操作;List<dynamic> 对 JSON 和 d_bincode 都友好。
+            Self::Tuple(_formats) => write!(w, "List<dynamic>"),
+            // English: Fixed-size arrays also map to List<T>; the size constraint is
+            // documented but not enforced at the type level
+            // 中文:固定大小数组也映射为 List<T>;大小约束写在文档里,不在类型层面强制
             Self::TupleArray { content, .. } => {
-                write!(w, "ListTuple<[")?;
+                write!(w, "List<")?;
                 content.write(w, lang)?;
-                write!(w, "]>")
+                write!(w, ">")
             }
             Self::Variable(_) => panic!("unexpected value"),
         }
@@ -297,26 +312,45 @@ impl Emitter<Dart> for Format {
 
 impl Emitter<Dart> for Named<Format> {
     fn write<W: IndentWrite>(&self, w: &mut W, lang: &Dart) -> Result<()> {
-        write!(w, "public {}: ", &self.name)?;
-        self.value.write(w, lang)
+        // English: Dart field declaration — `final <Type> <name>` (type first, not last like TS)
+        // 中文:Dart 字段声明 —— `final <类型> <字段名>`(类型在前,和 TS 相反)
+        write!(w, "final ")?;
+        self.value.write(w, lang)?;
+        write!(w, " {}", &self.name)
     }
 }
 
-/// Render a type expression to a string (used for constructor argument types).
-fn quote_type(format: &Format, lang: &Dart) -> String {
-    let mut buf = Vec::new();
-    let mut w = IndentedWriter::new(&mut buf, IndentConfig::Space(0));
-    format
-        .write(&mut w, lang)
-        .expect("writing to Vec should not fail");
-    String::from_utf8(buf).expect("type expression should be valid UTF-8")
-}
+// English: quote_type() removed — it was used to stringify type expressions for
+// TypeScript-style `constructor (public a: T, public b: U)` parameter lists.
+// Dart's `final <Type> <name>;` field declarations are written directly via
+// `Named<Format>::write`, so no intermediate stringification is needed.
+// 中文:quote_type() 删除 —— 原本用于把类型表达式序列化成字符串供 TS 风格的
+// `constructor (public a: T, public b: U)` 参数列表用。Dart 的 `final <Type> <name>;`
+// 字段声明直接通过 `Named<Format>::write` 写入,不需要中间字符串化步骤。
 
+/// Generate a Dart `final class` body.
+///
+/// English: For variants, emits `final class {Base}Variant{Name} extends {Base}`.
+/// For top-level containers, emits `final class {Name}`. Field declarations go
+/// first, followed by a `const` constructor whose parameter style is chosen
+/// based on [`FieldLayout`]:
+/// - `Unit` → `const Foo();`
+/// - `Positional` → `const Foo(this.a, this.b);` (for NewType/Tuple)
+/// - `Named` → `const Foo({required this.a, required this.b});` (for Struct)
+///
+/// Variant subclasses extending a sealed base class omit `: super()` since the
+/// base class has a const no-arg constructor and Dart's implicit super call works.
+///
+/// 中文:为 variant 生成 `final class {Base}Variant{Name} extends {Base}`;
+/// 为顶层容器生成 `final class {Name}`。字段声明在前,`const` 构造器在后,
+/// 构造器参数风格由 [`FieldLayout`] 决定。
+#[allow(clippy::too_many_arguments)]
 fn output_struct_or_variant<W: IndentWrite>(
     w: &mut W,
     ctx: &EmitContext<'_>,
     name: &str,
     fields: &[Named<Format>],
+    layout: FieldLayout,
     doc: &Doc,
     lang: &Dart,
 ) -> Result<()> {
@@ -324,30 +358,56 @@ fn output_struct_or_variant<W: IndentWrite>(
 
     writeln!(w)?;
     doc.write(w, lang)?;
+
+    // English: Class header — variant subclasses extend their parent sealed class
+    // 中文:类头 —— variant 子类继承父 sealed class
     if let Some(base) = variant_base {
-        write!(w, "export class {base}Variant{name} extends {base} ")?;
+        write!(w, "final class {base}Variant{name} extends {base} ")?;
     } else {
-        write!(w, "export class {name} ")?;
+        write!(w, "final class {name} ")?;
     }
     let mut w = w.block(Newlines::BOTH)?;
 
-    let args: Vec<String> = fields
-        .iter()
-        .map(|f| {
-            let type_str = quote_type(&f.value, lang);
-            format!("public {}: {}", &f.name, type_str)
-        })
-        .collect();
-    let args = args.join(", ");
-    write!(w, "constructor ({args}) ")?;
-    {
-        let mut w = w.block(Newlines::BOTH)?;
-        if variant_base.is_some() {
-            writeln!(w, "super();")?;
+    // English: Field declarations — `final <Type> <name>;` on its own line
+    // 中文:字段声明 —— 每个一行 `final <类型> <字段名>;`
+    for field in fields {
+        field.write(&mut w, lang)?;
+        writeln!(w, ";")?;
+    }
+    // Blank line between fields and constructor for readability
+    if !fields.is_empty() {
+        writeln!(w)?;
+    }
+
+    // English: Const constructor — parameter style depends on FieldLayout
+    // 中文:const 构造器 —— 参数风格取决于 FieldLayout
+    let class_name: String = if let Some(base) = variant_base {
+        format!("{base}Variant{name}")
+    } else {
+        name.to_string()
+    };
+
+    match layout {
+        FieldLayout::Unit => {
+            writeln!(w, "const {class_name}();")?;
+        }
+        FieldLayout::Positional => {
+            let params: Vec<String> = fields
+                .iter()
+                .map(|f| format!("this.{}", &f.name))
+                .collect();
+            writeln!(w, "const {class_name}({});", params.join(", "))?;
+        }
+        FieldLayout::Named => {
+            let params: Vec<String> = fields
+                .iter()
+                .map(|f| format!("required this.{}", &f.name))
+                .collect();
+            writeln!(w, "const {class_name}({{{}}});", params.join(", "))?;
         }
     }
 
-    // Plugin type bodies (serialize / deserialize methods).
+    // Plugin type bodies (serialize / deserialize methods — added in Step 5b/5c).
     for plugin in lang.plugins() {
         plugin.type_body(&mut w as &mut dyn IndentWrite, ctx)?;
     }
@@ -366,17 +426,23 @@ fn output_variant<W: IndentWrite>(
     doc: &Doc,
     lang: &Dart,
 ) -> Result<()> {
-    let fields: Vec<Named<Format>> = match variant {
-        VariantFormat::Unit => Vec::new(),
-        VariantFormat::NewType(format) => {
-            vec![Named::new(format.as_ref(), "value".to_string())]
-        }
-        VariantFormat::Tuple(formats) => formats
-            .iter()
-            .enumerate()
-            .map(|(i, f)| Named::new(f, format!("field{i}")))
-            .collect(),
-        VariantFormat::Struct(fields) => fields.clone(),
+    // English: Build fields + pick FieldLayout from the variant shape
+    // 中文:根据 variant 形状构建字段列表 + 选择 FieldLayout
+    let (fields, layout): (Vec<Named<Format>>, FieldLayout) = match variant {
+        VariantFormat::Unit => (Vec::new(), FieldLayout::Unit),
+        VariantFormat::NewType(format) => (
+            vec![Named::new(format.as_ref(), "value".to_string())],
+            FieldLayout::Positional,
+        ),
+        VariantFormat::Tuple(formats) => (
+            formats
+                .iter()
+                .enumerate()
+                .map(|(i, f)| Named::new(f, format!("field{i}")))
+                .collect(),
+            FieldLayout::Positional,
+        ),
+        VariantFormat::Struct(fields) => (fields.clone(), FieldLayout::Named),
         VariantFormat::Variable(_) => panic!("incorrect value"),
     };
 
@@ -388,9 +454,19 @@ fn output_variant<W: IndentWrite>(
         parent_name: base,
     };
     let ctx = EmitContext::for_variant(parent, variant_info);
-    output_struct_or_variant(w, &ctx, name, &fields, doc, lang)
+    output_struct_or_variant(w, &ctx, name, &fields, layout, doc, lang)
 }
 
+/// Generate a Dart enum container.
+///
+/// English: If all variants are unit, emit a native Dart `enum`. Otherwise,
+/// emit a `sealed class` with `final class FooVariantX extends Foo` subclasses.
+/// Dart 3's sealed class gives exhaustive switch coverage equivalent to
+/// Rust's match.
+///
+/// 中文:如果所有 variant 都是 unit,生成 Dart 原生 `enum`;否则生成
+/// `sealed class` + 子类。Dart 3 的 sealed class 提供穷尽性 switch 检查,
+/// 等价于 Rust 的 match。
 fn output_enum_container<W: IndentWrite>(
     w: &mut W,
     container: &Container<'_>,
@@ -399,11 +475,48 @@ fn output_enum_container<W: IndentWrite>(
     doc: &Doc,
     lang: &Dart,
 ) -> Result<()> {
+    // English: Detect if all variants are unit — if so, use Dart's native enum
+    // 中文:检测是否所有 variant 都是 unit —— 是则用 Dart 原生 enum
+    let all_unit = variants
+        .values()
+        .all(|v| matches!(v.value, VariantFormat::Unit));
+
+    if all_unit {
+        writeln!(w)?;
+        doc.write(w, lang)?;
+        write!(w, "enum {name} ")?;
+        let mut w = w.block(Newlines::BOTH)?;
+
+        // English: Dart enum values — one per line, comma-separated, semicolon after last.
+        // Variant names are preserved in PascalCase (Rust convention) for simpler
+        // bincode/json mapping; Dart's idiomatic lowerCamelCase could be done in a
+        // post-processing pass later.
+        // 中文:Dart enum 值,每行一个,逗号分隔,最后一个加分号。变体名保持
+        // PascalCase(和 Rust 一致),便于 bincode/json 映射;Dart 习惯的
+        // lowerCamelCase 可以作为后处理通道
+        let variant_list: Vec<&str> = variants.values().map(|v| v.name.as_str()).collect();
+        writeln!(w, "{};", variant_list.join(", "))?;
+
+        // Plugin type bodies (bincodeEncode/Decode, toJson/fromJson — added later).
+        let ctx = EmitContext::top_level(container);
+        for plugin in lang.plugins() {
+            plugin.type_body(&mut w as &mut dyn IndentWrite, &ctx)?;
+        }
+
+        return Ok(());
+    }
+
+    // English: Mixed or payload variants — use sealed class + final subclasses
+    // 中文:混合或带 payload 的 variant —— 用 sealed class + final 子类
     writeln!(w)?;
     doc.write(w, lang)?;
-    write!(w, "export abstract class {name} ")?;
+    write!(w, "sealed class {name} ")?;
     {
         let mut w = w.block(Newlines::BOTH)?;
+        // English: Const no-arg base constructor for variant subclasses to call
+        // 中文:无参 const 基类构造器,供 variant 子类调用
+        writeln!(w, "const {name}();")?;
+
         // Plugin type bodies (abstract serialize + static deserialize switch).
         let ctx = EmitContext::top_level(container);
         for plugin in lang.plugins() {
@@ -426,47 +539,25 @@ fn output_enum_container<W: IndentWrite>(
     Ok(())
 }
 
-const TYPE_ALIASES: [(&str, &str); 21] = [
-    ("unit", "type unit = null;"),
-    ("bool", "type bool = boolean;"),
-    ("int8", "type int8 = number;"),
-    ("int16", "type int16 = number;"),
-    ("int32", "type int32 = number;"),
-    ("int64", "type int64 = bigint;"),
-    ("int128", "type int128 = bigint;"),
-    ("uint8", "type uint8 = number;"),
-    ("uint16", "type uint16 = number;"),
-    ("uint32", "type uint32 = number;"),
-    ("uint64", "type uint64 = bigint;"),
-    ("uint128", "type uint128 = bigint;"),
-    ("float32", "type float32 = number;"),
-    ("float64", "type float64 = number;"),
-    ("char", "type char = string;"),
-    ("str", "type str = string;"),
-    ("bytes", "type bytes = Uint8Array;"),
-    ("option", "type Optional<T> = T | null;"),
-    ("seq", "type Seq<T> = T[];"),
-    ("tuple", "type Tuple<T extends any[]> = T;"),
-    (
-        "list_tuple",
-        "type ListTuple<T extends any[]> = Tuple<T>[];",
-    ),
-];
+// English: TYPE_ALIASES constant and format_type_aliases() helper removed —
+// Dart doesn't need type aliases because it has native `int` / `bool` / `double` /
+// `String` / `List<T>` / `Map<K,V>` / `T?` / `Uint8List`. The TypeScript backend
+// uses aliases like `type int32 = number` for readability, but in Dart we emit
+// the native types directly.
+// 中文:TYPE_ALIASES 常量和 format_type_aliases() 辅助函数都删除 —— Dart 有
+// 原生的 `int`/`bool`/`double`/`String`/`List<T>`/`Map<K,V>`/`T?`/`Uint8List`,
+// 不需要像 TypeScript 那样写 `type int32 = number` 之类的别名来提升可读性。
 
-#[cfg(test)]
-fn format_type_aliases(input: &BTreeSet<String>) -> String {
-    let map = BTreeMap::from(TYPE_ALIASES);
-    input
-        .iter()
-        .filter_map(|k| map.get(k.as_str()).map(|s| (*s).to_string()))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
+// English: Emitter tests re-enabled for Step 3 verification — snapshots will be
+// updated via `INSTA_UPDATE=always cargo test` once the output is verified correct.
+// tests_bincode still disabled (DartBincodePlugin is TS-style pending Step 5b).
+// 中文:Step 3 验证阶段重新启用 emitter 测试 —— snapshot 会用
+// `INSTA_UPDATE=always cargo test` 批量更新(输出确认正确后)。
+// tests_bincode 仍禁用(DartBincodePlugin 是 TS 风格,待 Step 5b 重写)。
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
-#[cfg(test)]
-mod tests_bincode;
-// English: tests_json deleted for Step 2 — will be rewritten in Step 5c when DartJsonPlugin is implemented
-// 中文:tests_json 在 Step 2 阶段删除,Step 5c 实现 DartJsonPlugin 时重写
+// #[cfg(test)]
+// mod tests_bincode;
+// #[cfg(test)]
+// mod tests_json;

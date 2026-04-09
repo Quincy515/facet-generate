@@ -227,7 +227,7 @@ fn output_adds_import_for_external_namespace() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "../other";"#));
+    assert!(output.contains(r#"import '../other.dart' as Other;"#));
 }
 
 #[test]
@@ -239,7 +239,7 @@ fn output_does_not_import_current_module() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(!output.contains(r#"import * as Root from "../root";"#));
+    assert!(!output.contains(r#"import '../root.dart' as Root;"#));
 }
 
 #[test]
@@ -261,8 +261,8 @@ fn output_uses_external_package_path_for_namespace() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "shared-types";"#));
-    assert!(!output.contains(r#"import * as Other from "../other";"#));
+    assert!(output.contains(r#"import 'shared-types.dart' as Other;"#));
+    assert!(!output.contains(r#"import '../other.dart' as Other;"#));
 }
 
 #[test]
@@ -284,7 +284,7 @@ fn output_uses_external_package_module_name_when_present() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "shared-types/models";"#));
+    assert!(output.contains(r#"import 'shared-types/models.dart' as Other;"#));
 }
 
 #[test]
@@ -307,7 +307,7 @@ fn output_uses_for_namespace_for_url_packages() {
 
     // TS imports use the package namespace identifier; URL metadata is used by installer logic.
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Remote from "@org/remote";"#));
+    assert!(output.contains(r#"import '@org/remote.dart' as Remote;"#));
 }
 
 #[test]
@@ -334,8 +334,8 @@ fn output_external_package_takes_priority_over_relative_import() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "shared-types";"#));
-    assert!(!output.contains(r#"import * as Other from "../other";"#));
+    assert!(output.contains(r#"import 'shared-types.dart' as Other;"#));
+    assert!(!output.contains(r#"import '../other.dart' as Other;"#));
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn output_falls_back_to_relative_import_without_external_package() {
     )));
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Legacy from "../legacy";"#));
+    assert!(output.contains(r#"import '../legacy.dart' as Legacy;"#));
 }
 
 #[test]
@@ -399,8 +399,8 @@ fn output_handles_multiple_external_packages() {
     );
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Auth from "@org/auth";"#));
-    assert!(output.contains(r#"import * as Billing from "billing-types/v1";"#));
+    assert!(output.contains(r#"import '@org/auth.dart' as Auth;"#));
+    assert!(output.contains(r#"import 'billing-types/v1.dart' as Billing;"#));
 }
 
 #[test]
@@ -494,11 +494,11 @@ fn output_mixed_external_and_local_references() {
     );
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "shared-types";"#));
-    assert!(!output.contains(r#"import * as Root from "../root";"#));
-    assert!(output.contains("public local_root: LocalRoot"));
-    assert!(output.contains("public local_namespaced: LocalNamespaced"));
-    assert!(output.contains("public external: Other.Child"));
+    assert!(output.contains(r#"import 'shared-types.dart' as Other;"#));
+    assert!(!output.contains(r#"import '../root.dart' as Root;"#));
+    assert!(output.contains("final LocalRoot local_root"));
+    assert!(output.contains("final LocalNamespaced local_namespaced"));
+    assert!(output.contains("final Other.Child external"));
 }
 
 #[test]
@@ -555,8 +555,11 @@ fn output_user_example_multiple_external_references() {
     );
 
     let output = render_output(&config, &registry);
-    assert!(output.contains(r#"import * as Other from "other-package/models";"#));
+    assert!(output.contains(r#"import 'other-package/models.dart' as Other;"#));
     assert_eq!(output.matches("Other.Other").count(), 4);
-    assert!(output.contains("public image: Optional<CatImage>"));
-    assert!(output.contains("const image = deserializeOption(deserializer, (deserializer) => {"));
+    assert!(output.contains("final CatImage? image"));
+    // English: deserialization assertion removed — Dart doesn't use a deserializeOption
+    // helper; nullable handling is inline in the generated fromJson/bincodeDecode code.
+    // 中文:反序列化断言删除 —— Dart 不用 deserializeOption 辅助函数,可空处理
+    // 内联在生成的 fromJson/bincodeDecode 代码里。
 }
