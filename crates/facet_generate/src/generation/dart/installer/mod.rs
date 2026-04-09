@@ -1,39 +1,45 @@
-//! Project scaffolding — writes a ready-to-build Dart project to disk.
+//! Project scaffolding — writes a ready-to-build Dart package to disk.
 //!
 //! The [`Installer`] is the final stage of the Dart generation pipeline.
 //! While [`DartCodeGenerator`] produces the *contents* of a single source file,
 //! the installer is responsible for the surrounding project structure:
 //!
-//! 1. **Runtime files** — copies the serde and/or bincode runtime `.ts`
-//!    sources into the output directory, adapting file names and import paths
-//!    using extensionless imports (`index.ts` entry points, `.ts` stripped
-//!    from import paths).
-//!
-//! 2. **Per-module source files** — splits the registry by namespace (via
+//! 1. **Per-module source files** — splits the registry by namespace (via
 //!    [`module::split`]) and calls [`DartCodeGenerator`] once per namespace,
-//!    writing each to its own `.ts` file. Dart has no `namespace`
-//!    keyword here — the crate's namespace concept maps to **ES modules**
-//!    (separate `.ts` files), and cross-module type references use
-//!    `import * as Namespace` wildcard imports with `Namespace.Type` syntax.
+//!    writing each to its own `lib/<namespace>.dart` file. Dart's package
+//!    layout requires source files to live under `lib/` so they can be
+//!    referenced via `import 'package:<package_name>/<module>.dart'`.
 //!
-//! 3. **`package.json`** — generates an NPM manifest with dependencies
-//!    (external packages as `file:` paths or versioned registry references)
-//!    and devDependencies (`dart`).
+//! 2. **`pubspec.yaml`** — generates a Dart pubspec manifest with dependencies
+//!    (external packages as `path:` references for local paths or as
+//!    versioned hosted entries for URL locations).
+//!
+//! # No runtime files
+//!
+//! Unlike the TypeScript installer (which copies `serde` and `bincode`
+//! runtime sources alongside the generated code), the Dart installer
+//! **does not install any runtime files**. The Dart bincode runtime
+//! (`d_bincode`) is expected to be vendored into the consuming project
+//! separately — see `verification/dart-bincode-compat/README.md` and
+//! the Obsidian decision note §13.5 for the reasoning.
+//!
+//! # English / 中文
+//!
+//! English: see above.
+//! 中文:见英文文档。Dart installer 只负责产出 lib/*.dart + pubspec.yaml,
+//! **不**安装任何运行时文件。bincode 运行时 d_bincode 由消费方项目自行 vendor。
 
 use std::{
-    collections::BTreeMap,
     fs::{File, create_dir_all},
     io::Write as _,
     path::{Path, PathBuf},
 };
 
-use serde_json::{Value, json};
-
 use crate::{
     Registry,
     generation::{
         CodeGeneratorConfig, Encoding, Error, ExternalPackage, ExternalPackages, PackageLocation,
-        SERDE_NAMESPACE, SourceInstaller, module, dart::DartCodeGenerator,
+        SourceInstaller, dart::DartCodeGenerator, module,
     },
 };
 
@@ -41,11 +47,11 @@ use crate::{
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// use facet_generate::generation::dart;
 ///
 /// let output_dir = std::path::PathBuf::from("output");
-/// let installer = dart::Installer::new("my-package", &output_dir);
+/// let installer = dart::Installer::new("my_package", &output_dir);
 /// ```
 pub struct Installer {
     package_name: String,
@@ -72,9 +78,11 @@ impl Installer {
 
     /// Set the encoding for serialization/deserialization.
     ///
-    /// When set to anything other than [`Encoding::None`], the appropriate
-    /// runtimes (serde + encoding-specific) are installed automatically by
-    /// [`generate`](Self::generate).
+    /// Unlike other language installers, the Dart installer does not install
+    /// any runtime files based on the encoding — it only forwards the encoding
+    /// to the code generator (which decides whether to emit bincode/JSON
+    /// methods on the generated classes). Runtime libraries (`d_bincode`,
+    /// `dart:convert`) are the consuming project's responsibility.
     #[must_use]
     pub const fn encoding(mut self, encoding: Encoding) -> Self {
         self.encoding = encoding;
@@ -94,23 +102,16 @@ impl Installer {
     /// Generate all code for the given registry.
     ///
     /// This method:
-    /// 1. Installs the appropriate runtimes based on the configured encoding
-    /// 2. Splits the registry by namespace and installs each module
-    /// 3. Writes the package manifest
+    /// 1. Splits the registry by namespace and writes each module to
+    ///    `lib/<namespace>.dart`
+    /// 2. Writes `pubspec.yaml` at the install root
+    ///
+    /// **No runtime files are installed** — see the module-level docs.
     ///
     /// # Errors
     ///
     /// Returns an error if any file operation or code generation step fails.
     pub fn generate(mut self, registry: &Registry) -> Result<(), Error> {
-        // Install runtimes if an encoding is configured,
-        // unless an external package provides them
-        if !self.encoding.is_none() && !self.external_packages.contains_key(SERDE_NAMESPACE) {
-            self.install_serde_runtime()?;
-            if self.encoding == Encoding::Bincode {
-                self.install_bincode_runtime()?;
-            }
-        }
-
         // Split by namespace and install each module
         for (m, module_registry) in module::split(&self.package_name, registry) {
             let config = m.config().clone().with_encoding(self.encoding);
@@ -124,79 +125,80 @@ impl Installer {
         Ok(())
     }
 
-    fn install_runtime(&self, source_dir: &include_dir::Dir, path: &str) -> Result<(), Error> {
-        let dir_path = self.install_dir.join(path);
-        create_dir_all(&dir_path)?;
-        for entry in source_dir.files() {
-            let file_name = entry.path().to_string_lossy();
-            let mut file = File::create(dir_path.join(file_name.as_ref()))?;
-            file.write_all(entry.contents())?;
-        }
-        Ok(())
-    }
-
-    /// Produce the contents of a `package.json` manifest.
+    /// Produce the contents of a `pubspec.yaml` manifest as a YAML string.
     ///
-    /// Dependencies are derived from external packages: `Path` locations
-    /// become `file:` references, `Url` locations use the extracted package
-    /// name with an optional version string. `dart` is always added as
-    /// a devDependency.
+    /// English: Hand-written YAML to avoid pulling in a YAML serde dependency
+    /// for what is structurally a very simple file. The format follows Dart's
+    /// pubspec specification:
+    /// ```yaml
+    /// name: my_package
+    /// description: ...
+    /// version: 0.1.0
+    /// environment:
+    ///   sdk: ^3.5.0
+    /// dependencies:
+    ///   shared_types:
+    ///     path: ../shared_types
+    ///   http: ^1.0.0
+    /// ```
+    ///
+    /// 中文:手写 YAML 以避免引入 YAML serde 依赖(这个文件结构非常简单)。
+    /// 格式遵循 Dart pubspec 规范。
     #[must_use]
-    pub fn make_manifest(&self, package_name: &str) -> Value {
-        let mut manifest = json!({
-            "name": package_name,
-            "version": "0.1.0"
-        });
+    pub fn make_manifest(&self, package_name: &str) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("name: {package_name}\n"));
+        out.push_str("description: Generated Dart types from facet-generate.\n");
+        out.push_str("version: 0.1.0\n");
+        out.push_str("publish_to: 'none'\n");
+        out.push('\n');
+        out.push_str("environment:\n");
+        out.push_str("  sdk: ^3.5.0\n");
 
         // Add dependencies if we have external packages
         if !self.external_packages.is_empty() {
-            let mut dependencies = BTreeMap::new();
+            out.push('\n');
+            out.push_str("dependencies:\n");
 
-            for external_package in self.external_packages.values() {
-                let (name, version) = match &external_package.location {
-                    PackageLocation::Path(path) => (
-                        external_package.for_namespace.clone(),
-                        format!("file:{path}"),
-                    ),
-                    PackageLocation::Url(url) => (
-                        {
-                            // Extract package name from URL
-                            let parts: Vec<&str> = url.split('/').collect();
-                            if parts.len() >= 2 && parts[parts.len() - 2].starts_with('@') {
-                                // Scoped package: @scope/package-name
-                                format!("{}/{}", parts[parts.len() - 2], parts[parts.len() - 1])
-                            } else if let Some(last_segment) = parts.last() {
-                                // Regular package: package-name
-                                (*last_segment).to_string()
-                            } else {
-                                url.clone()
-                            }
-                        },
-                        external_package
+            // English: Sort by namespace name for stable output (BTreeMap iteration is
+            // already sorted, but ExternalPackages is a HashMap-like — be safe).
+            // 中文:按 namespace 名排序输出,保证稳定性。
+            let mut sorted: Vec<&ExternalPackage> = self.external_packages.values().collect();
+            sorted.sort_by(|a, b| a.for_namespace.cmp(&b.for_namespace));
+
+            for ext in sorted {
+                let pkg_name = &ext.for_namespace;
+                match &ext.location {
+                    PackageLocation::Path(path) => {
+                        // English: Path dependency uses YAML nested mapping
+                        // 中文:路径依赖用嵌套 mapping
+                        out.push_str(&format!("  {pkg_name}:\n"));
+                        out.push_str(&format!("    path: {path}\n"));
+                    }
+                    PackageLocation::Url(_url) => {
+                        // English: Treat URL packages as hosted (pub.dev) with their
+                        // version constraint. Dart's pubspec format for hosted packages
+                        // with a simple version constraint uses inline syntax:
+                        //   <pkg>: <version>
+                        // 中文:URL 包视为 pub.dev 上的 hosted 包,用版本约束
+                        let version = ext
                             .version
                             .clone()
-                            .unwrap_or_else(|| "*".to_string()),
-                    ),
-                };
-                dependencies.insert(name, version);
+                            .unwrap_or_else(|| "any".to_string());
+                        out.push_str(&format!("  {pkg_name}: {version}\n"));
+                    }
+                }
             }
-
-            manifest["dependencies"] = json!(dependencies);
         }
 
-        // Always add devDependencies
-        manifest["devDependencies"] = json!({
-            "dart": "^5.8.3"
-        });
-
-        manifest
+        out
     }
 }
 
 impl SourceInstaller for Installer {
-    /// Generate a single `.ts` source file for one namespace.
+    /// Generate a single `.dart` source file for one namespace.
     ///
-    /// The file is written as `<namespace>.ts` directly in the install
+    /// The file is written as `lib/<namespace>.dart` under the install
     /// directory. Namespaces that correspond to external packages are skipped
     /// — their types are imported rather than generated.
     fn install_module(
@@ -208,9 +210,13 @@ impl SourceInstaller for Installer {
         if skip_module {
             return Ok(());
         }
-        create_dir_all(&self.install_dir)?;
+        // English: Dart packages require source files under `lib/` for them
+        // to be importable via `package:<name>/<module>.dart`. Create it.
+        // 中文:Dart 包要求源码在 `lib/` 下,才能通过 `package:` import 引用。
+        let lib_dir = self.install_dir.join("lib");
+        create_dir_all(&lib_dir)?;
         let module_name = config.module_name();
-        let file_name = self.install_dir.join(format!("{module_name}.ts"));
+        let file_name = lib_dir.join(format!("{module_name}.dart"));
         let mut file = File::create(file_name)?;
 
         // Update config with external packages from installer
@@ -223,24 +229,27 @@ impl SourceInstaller for Installer {
         Ok(())
     }
 
+    /// **No-op for Dart.** The Dart bincode runtime (`d_bincode`) is vendored
+    /// into the consuming project separately, not installed alongside generated
+    /// code. See module-level docs for the rationale.
     fn install_serde_runtime(&mut self) -> Result<(), Error> {
-        static SERDE_DIR: include_dir::Dir<'static> =
-            include_dir::include_dir!("$CARGO_MANIFEST_DIR/runtime/dart-node/serde");
-        self.install_runtime(&SERDE_DIR, "serde")
+        // English: intentional no-op — Dart users vendor d_bincode themselves
+        // 中文:故意空实现 —— Dart 用户自己 vendor d_bincode
+        Ok(())
     }
 
+    /// **No-op for Dart.** Same reasoning as `install_serde_runtime`.
     fn install_bincode_runtime(&self) -> Result<(), Error> {
-        static BINCODE_DIR: include_dir::Dir<'static> =
-            include_dir::include_dir!("$CARGO_MANIFEST_DIR/runtime/dart-node/bincode");
-        self.install_runtime(&BINCODE_DIR, "bincode")
+        // English: intentional no-op
+        // 中文:故意空实现
+        Ok(())
     }
 
-    /// Write `package.json` to the output directory.
+    /// Write `pubspec.yaml` to the output directory.
     fn install_manifest(&self, package_name: &str) -> std::result::Result<(), Error> {
         let manifest = self.make_manifest(package_name);
-        let manifest = serde_json::to_string_pretty(&manifest)?;
 
-        let manifest_path = self.install_dir.join("package.json");
+        let manifest_path = self.install_dir.join("pubspec.yaml");
         let mut file = File::create(manifest_path)?;
         file.write_all(manifest.as_bytes())?;
 

@@ -1,16 +1,14 @@
 //! Snapshot tests for the Dart [`Installer`] — **project scaffolding**.
 //!
-//! These tests verify the `package.json` manifest that the installer
+//! These tests verify the `pubspec.yaml` manifest that the installer
 //! generates, and the file layout produced by `install_module`. They cover:
 //!
-//! - Basic manifest structure: package name, version, devDependencies.
-//! - External URL dependencies: registry package references with version
-//!   strings (including scoped `@org/package` names).
-//! - External path dependencies: local file-system dependencies via
-//!   `file:` paths.
-//! - Serde/bincode runtime installation.
-//! - Multi-module (namespace) scenarios where each namespace becomes a
-//!   separate `.ts` file.
+//! - Basic manifest structure: package name, version, environment.
+//! - External URL dependencies: hosted `pub.dev` packages with version constraints.
+//! - External path dependencies: local path dependencies via the
+//!   YAML `path:` key.
+//! - Multi-module (namespace) scenarios.
+//! - Each namespace becomes a separate `lib/<namespace>.dart` file.
 
 use facet::Facet;
 
@@ -31,15 +29,15 @@ fn simple_manifest() {
 
     let manifest = installer.make_manifest(package_name);
 
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+    ");
 }
 
 #[test]
@@ -67,19 +65,19 @@ fn manifest_with_dependencies() {
 
     let manifest = installer.make_manifest(package_name);
 
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "dependencies": {
-        "axios": "^1.6.0",
-        "lodash": "^4.17.21"
-      },
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      axios: ^1.6.0
+      lodash: ^4.17.21
+    ");
 }
 
 #[test]
@@ -98,18 +96,19 @@ fn manifest_with_local_dependencies() {
         Installer::new(package_name, install_dir.path()).external_packages(&external_pkgs);
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "dependencies": {
-        "shared-types": "file:../shared-types"
-      },
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      shared-types:
+        path: ../shared-types
+    ");
 }
 
 #[test]
@@ -137,19 +136,20 @@ fn manifest_with_mixed_dependencies() {
         Installer::new(package_name, install_dir.path()).external_packages(&external_pkgs);
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "dependencies": {
-        "lodash": "^4.17.21",
-        "shared-types": "file:../shared-types"
-      },
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      lodash: ^4.17.21
+      shared-types:
+        path: ../shared-types
+    ");
 }
 
 #[test]
@@ -176,15 +176,15 @@ fn manifest_with_serde_module() {
     installer.install_serde_runtime().unwrap();
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+    ");
 }
 
 #[test]
@@ -213,15 +213,15 @@ fn manifest_with_namespaces() {
     }
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+    ");
 }
 
 #[test]
@@ -259,18 +259,18 @@ fn manifest_with_external_namespace_dependencies() {
     }
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "dependencies": {
-        "external-package": "^1.0.0"
-      },
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      external_package: ^1.0.0
+    ");
 }
 
 #[test]
@@ -289,16 +289,16 @@ fn manifest_with_scoped_package() {
         Installer::new(package_name, install_dir.path()).external_packages(&external_pkgs);
 
     let manifest = installer.make_manifest(package_name);
-    insta::assert_json_snapshot!(manifest, @r#"
-    {
-      "dependencies": {
-        "@types/node": "^20.0.0"
-      },
-      "devDependencies": {
-        "dart": "^5.8.3"
-      },
-      "name": "my-package",
-      "version": "0.1.0"
-    }
-    "#);
+    insta::assert_snapshot!(manifest, @"
+    name: my-package
+    description: Generated Dart types from facet-generate.
+    version: 0.1.0
+    publish_to: 'none'
+
+    environment:
+      sdk: ^3.5.0
+
+    dependencies:
+      types: ^20.0.0
+    ");
 }
