@@ -445,8 +445,15 @@ fn output_deserialization_uses_local_and_external_qualification() {
     );
 
     let output = render_output(&config, &registry);
-    assert!(output.contains("const local = LocalType.deserialize(deserializer);"));
-    assert!(output.contains("const external = Other.ExternalType.deserialize(deserializer);"));
+    // English: Dart backend uses `final <name> = <Type>.bincodeDecode(r);` for
+    // deserialization. Note the field name `external` is a Dart reserved word
+    // and gets automatically sanitized to `external_` (verifying the Step 4
+    // sanitize_dart_ident integration works for TypeName references too).
+    // 中文:Dart 后端的反序列化使用 `final <name> = <Type>.bincodeDecode(r);`。
+    // 注意字段名 `external` 是 Dart 保留字,自动被清理为 `external_`
+    //(验证 Step 4 的 sanitize_dart_ident 对 TypeName 引用也生效)。
+    assert!(output.contains("final local = LocalType.bincodeDecode(r);"));
+    assert!(output.contains("final external_ = Other.ExternalType.bincodeDecode(r);"));
 }
 
 #[test]

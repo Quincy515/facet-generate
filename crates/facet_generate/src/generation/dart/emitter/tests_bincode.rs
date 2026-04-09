@@ -33,15 +33,14 @@ fn unit_struct_1() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class UnitStruct {
-        constructor () {
+    final class UnitStruct {
+        const UnitStruct();
+
+        void bincodeEncode(BincodeWriter w) {
         }
 
-        public serialize(serializer: Serializer): void {
-        }
-
-        static deserialize(deserializer: Deserializer): UnitStruct {
-            return new UnitStruct();
+        static UnitStruct bincodeDecode(BincodeReader r) {
+            return const UnitStruct();
         }
     }
     ");
@@ -56,15 +55,14 @@ fn unit_struct_2() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class UnitStruct {
-        constructor () {
+    final class UnitStruct {
+        const UnitStruct();
+
+        void bincodeEncode(BincodeWriter w) {
         }
 
-        public serialize(serializer: Serializer): void {
-        }
-
-        static deserialize(deserializer: Deserializer): UnitStruct {
-            return new UnitStruct();
+        static UnitStruct bincodeDecode(BincodeReader r) {
+            return const UnitStruct();
         }
     }
     ");
@@ -79,17 +77,18 @@ fn newtype_struct() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class NewType {
-        constructor (public value: str) {
+    final class NewType {
+        final String value;
+
+        const NewType(this.value);
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(value);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.value);
-        }
-
-        static deserialize(deserializer: Deserializer): NewType {
-            const value = deserializer.deserializeStr();
-            return new NewType(value);
+        static NewType bincodeDecode(BincodeReader r) {
+            final value = r.readString();
+            return NewType(value);
         }
     }
     ");
@@ -104,19 +103,21 @@ fn tuple_struct() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class TupleStruct {
-        constructor (public field0: str, public field1: int32) {
+    final class TupleStruct {
+        final String field0;
+        final int field1;
+
+        const TupleStruct(this.field0, this.field1);
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(field0);
+            w.writeI32(field1);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.field0);
-            serializer.serializeI32(this.field1);
-        }
-
-        static deserialize(deserializer: Deserializer): TupleStruct {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            return new TupleStruct(field0,field1);
+        static TupleStruct bincodeDecode(BincodeReader r) {
+            final field0 = r.readString();
+            final field1 = r.readI32();
+            return TupleStruct(field0, field1);
         }
     }
     ");
@@ -148,47 +149,63 @@ fn struct_with_fields_of_primitive_types() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class StructWithFields {
-        constructor (public unit: unit, public bool: bool, public i8: int8, public i16: int16, public i32: int32, public i64: int64, public i128: int128, public u8: uint8, public u16: uint16, public u32: uint32, public u64: uint64, public u128: uint128, public f32: float32, public f64: float64, public char: char, public string: str) {
+    final class StructWithFields {
+        final Null unit;
+        final bool bool;
+        final int i8;
+        final int i16;
+        final int i32;
+        final int i64;
+        final BigInt i128;
+        final int u8;
+        final int u16;
+        final int u32;
+        final int u64;
+        final BigInt u128;
+        final double f32;
+        final double f64;
+        final String char;
+        final String string;
+
+        const StructWithFields({required this.unit, required this.bool, required this.i8, required this.i16, required this.i32, required this.i64, required this.i128, required this.u8, required this.u16, required this.u32, required this.u64, required this.u128, required this.f32, required this.f64, required this.char, required this.string});
+
+        void bincodeEncode(BincodeWriter w) {
+            // unit: no bytes
+            w.writeBool(bool);
+            w.writeI8(i8);
+            w.writeI16(i16);
+            w.writeI32(i32);
+            w.writeI64(i64);
+            w.writeI128(i128);
+            w.writeU8(u8);
+            w.writeU16(u16);
+            w.writeU32(u32);
+            w.writeU64(u64);
+            w.writeU128(u128);
+            w.writeF32(f32);
+            w.writeF64(f64);
+            w.writeChar(char);
+            w.writeString(string);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeUnit(this.unit);
-            serializer.serializeBool(this.bool);
-            serializer.serializeI8(this.i8);
-            serializer.serializeI16(this.i16);
-            serializer.serializeI32(this.i32);
-            serializer.serializeI64(this.i64);
-            serializer.serializeI128(this.i128);
-            serializer.serializeU8(this.u8);
-            serializer.serializeU16(this.u16);
-            serializer.serializeU32(this.u32);
-            serializer.serializeU64(this.u64);
-            serializer.serializeU128(this.u128);
-            serializer.serializeF32(this.f32);
-            serializer.serializeF64(this.f64);
-            serializer.serializeChar(this.char);
-            serializer.serializeStr(this.string);
-        }
-
-        static deserialize(deserializer: Deserializer): StructWithFields {
-            const unit = deserializer.deserializeUnit();
-            const bool = deserializer.deserializeBool();
-            const i8 = deserializer.deserializeI8();
-            const i16 = deserializer.deserializeI16();
-            const i32 = deserializer.deserializeI32();
-            const i64 = deserializer.deserializeI64();
-            const i128 = deserializer.deserializeI128();
-            const u8 = deserializer.deserializeU8();
-            const u16 = deserializer.deserializeU16();
-            const u32 = deserializer.deserializeU32();
-            const u64 = deserializer.deserializeU64();
-            const u128 = deserializer.deserializeU128();
-            const f32 = deserializer.deserializeF32();
-            const f64 = deserializer.deserializeF64();
-            const char = deserializer.deserializeChar();
-            const string = deserializer.deserializeStr();
-            return new StructWithFields(unit,bool,i8,i16,i32,i64,i128,u8,u16,u32,u64,u128,f32,f64,char,string);
+        static StructWithFields bincodeDecode(BincodeReader r) {
+            final unit = null;
+            final bool = r.readBool();
+            final i8 = r.readI8();
+            final i16 = r.readI16();
+            final i32 = r.readI32();
+            final i64 = r.readI64();
+            final i128 = r.readI128();
+            final u8 = r.readU8();
+            final u16 = r.readU16();
+            final u32 = r.readU32();
+            final u64 = r.readU64();
+            final u128 = r.readU128();
+            final f32 = r.readF32();
+            final f64 = r.readF64();
+            final char = r.readChar();
+            final string = r.readString();
+            return StructWithFields(unit: unit, bool: bool, i8: i8, i16: i16, i32: i32, i64: i64, i128: i128, u8: u8, u16: u16, u32: u32, u64: u64, u128: u128, f32: f32, f64: f64, char: char, string: string);
         }
     }
     ");
@@ -218,68 +235,75 @@ fn struct_with_fields_of_user_types() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class Inner1 {
-        constructor (public field1: str) {
+    final class Inner1 {
+        final String field1;
+
+        const Inner1({required this.field1});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(field1);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.field1);
-        }
-
-        static deserialize(deserializer: Deserializer): Inner1 {
-            const field1 = deserializer.deserializeStr();
-            return new Inner1(field1);
-        }
-    }
-
-
-    export class Inner2 {
-        constructor (public value: str) {
-        }
-
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.value);
-        }
-
-        static deserialize(deserializer: Deserializer): Inner2 {
-            const value = deserializer.deserializeStr();
-            return new Inner2(value);
+        static Inner1 bincodeDecode(BincodeReader r) {
+            final field1 = r.readString();
+            return Inner1(field1: field1);
         }
     }
 
 
-    export class Inner3 {
-        constructor (public field0: str, public field1: int32) {
+    final class Inner2 {
+        final String value;
+
+        const Inner2(this.value);
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(value);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.field0);
-            serializer.serializeI32(this.field1);
-        }
-
-        static deserialize(deserializer: Deserializer): Inner3 {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            return new Inner3(field0,field1);
+        static Inner2 bincodeDecode(BincodeReader r) {
+            final value = r.readString();
+            return Inner2(value);
         }
     }
 
 
-    export class Outer {
-        constructor (public one: Inner1, public two: Inner2, public three: Inner3) {
+    final class Inner3 {
+        final String field0;
+        final int field1;
+
+        const Inner3(this.field0, this.field1);
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(field0);
+            w.writeI32(field1);
         }
 
-        public serialize(serializer: Serializer): void {
-            this.one.serialize(serializer);
-            this.two.serialize(serializer);
-            this.three.serialize(serializer);
+        static Inner3 bincodeDecode(BincodeReader r) {
+            final field0 = r.readString();
+            final field1 = r.readI32();
+            return Inner3(field0, field1);
+        }
+    }
+
+
+    final class Outer {
+        final Inner1 one;
+        final Inner2 two;
+        final Inner3 three;
+
+        const Outer({required this.one, required this.two, required this.three});
+
+        void bincodeEncode(BincodeWriter w) {
+            one.bincodeEncode(w);
+            two.bincodeEncode(w);
+            three.bincodeEncode(w);
         }
 
-        static deserialize(deserializer: Deserializer): Outer {
-            const one = Inner1.deserialize(deserializer);
-            const two = Inner2.deserialize(deserializer);
-            const three = Inner3.deserialize(deserializer);
-            return new Outer(one,two,three);
+        static Outer bincodeDecode(BincodeReader r) {
+            final one = Inner1.bincodeDecode(r);
+            final two = Inner2.bincodeDecode(r);
+            final three = Inner3.bincodeDecode(r);
+            return Outer(one: one, two: two, three: three);
         }
     }
     ");
@@ -296,20 +320,21 @@ fn struct_with_field_that_is_a_2_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32]>) {
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString((one[0]));
+            w.writeI32((one[1]));
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.one[0]);
-            serializer.serializeI32(this.one[1]);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            const one = [field0, field1] as [str, int32];
-            return new MyStruct(one);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _one_t0 = r.readString();
+            final _one_t1 = r.readI32();
+            final one = <dynamic>[_one_t0, _one_t1];
+            return MyStruct(one: one);
         }
     }
     ");
@@ -326,22 +351,23 @@ fn struct_with_field_that_is_a_3_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32, uint16]>) {
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString((one[0]));
+            w.writeI32((one[1]));
+            w.writeU16((one[2]));
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.one[0]);
-            serializer.serializeI32(this.one[1]);
-            serializer.serializeU16(this.one[2]);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            const field2 = deserializer.deserializeU16();
-            const one = [field0, field1, field2] as [str, int32, uint16];
-            return new MyStruct(one);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _one_t0 = r.readString();
+            final _one_t1 = r.readI32();
+            final _one_t2 = r.readU16();
+            final one = <dynamic>[_one_t0, _one_t1, _one_t2];
+            return MyStruct(one: one);
         }
     }
     ");
@@ -358,24 +384,25 @@ fn struct_with_field_that_is_a_4_tuple() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public one: Tuple<[str, int32, uint16, float32]>) {
+    final class MyStruct {
+        final List<dynamic> one;
+
+        const MyStruct({required this.one});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString((one[0]));
+            w.writeI32((one[1]));
+            w.writeU16((one[2]));
+            w.writeF32((one[3]));
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.one[0]);
-            serializer.serializeI32(this.one[1]);
-            serializer.serializeU16(this.one[2]);
-            serializer.serializeF32(this.one[3]);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            const field2 = deserializer.deserializeU16();
-            const field3 = deserializer.deserializeF32();
-            const one = [field0, field1, field2, field3] as [str, int32, uint16, float32];
-            return new MyStruct(one);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _one_t0 = r.readString();
+            final _one_t1 = r.readI32();
+            final _one_t2 = r.readU16();
+            final _one_t3 = r.readF32();
+            final one = <dynamic>[_one_t0, _one_t1, _one_t2, _one_t3];
+            return MyStruct(one: one);
         }
     }
     ");
@@ -393,65 +420,25 @@ fn enum_with_unit_variants() {
     }
 
     let actual = emit!(EnumWithUnitVariants as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class EnumWithUnitVariants {
-        abstract serialize(serializer: Serializer): void;
+    enum EnumWithUnitVariants {
+        Variant1, Variant2, Variant3;
 
-        static deserialize(deserializer: Deserializer): EnumWithUnitVariants {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return EnumWithUnitVariantsVariantVariant1.load(deserializer);
-                case 1: return EnumWithUnitVariantsVariantVariant2.load(deserializer);
-                case 2: return EnumWithUnitVariantsVariantVariant3.load(deserializer);
-                default: throw new Error("Unknown variant index for EnumWithUnitVariants: " + index);
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(index);
+        }
+
+        static EnumWithUnitVariants bincodeDecode(BincodeReader r) {
+            final idx = r.readU32();
+            if (idx < 0 || idx >= values.length) {
+                throw StateError('Unknown EnumWithUnitVariants variant index: $idx');
             }
+            return values[idx];
         }
     }
-
-    export class EnumWithUnitVariantsVariantVariant1 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
-
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-        }
-
-        static load(deserializer: Deserializer): EnumWithUnitVariantsVariantVariant1 {
-            return new EnumWithUnitVariantsVariantVariant1();
-        }
-    }
-
-    export class EnumWithUnitVariantsVariantVariant2 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
-
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(1);
-        }
-
-        static load(deserializer: Deserializer): EnumWithUnitVariantsVariantVariant2 {
-            return new EnumWithUnitVariantsVariantVariant2();
-        }
-    }
-
-    export class EnumWithUnitVariantsVariantVariant3 extends EnumWithUnitVariants {
-        constructor () {
-            super();
-        }
-
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(2);
-        }
-
-        static load(deserializer: Deserializer): EnumWithUnitVariantsVariantVariant3 {
-            return new EnumWithUnitVariantsVariantVariant3();
-        }
-    }
-    "#);
+    ");
 }
 
 #[test]
@@ -465,35 +452,25 @@ fn enum_with_unit_struct_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    enum MyEnum {
+        Variant1;
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantVariant1.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(index);
+        }
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final idx = r.readU32();
+            if (idx < 0 || idx >= values.length) {
+                throw StateError('Unknown MyEnum variant index: $idx');
             }
+            return values[idx];
         }
     }
-
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor () {
-            super();
-        }
-
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-        }
-
-        static load(deserializer: Deserializer): MyEnumVariantVariant1 {
-            return new MyEnumVariantVariant1();
-        }
-    }
-    "#);
+    ");
 }
 
 #[test]
@@ -506,37 +483,38 @@ fn enum_with_1_tuple_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    sealed class MyEnum {
+        const MyEnum();
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantVariant1.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w);
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final variant = r.readU32();
+            switch (variant) {
+                case 0: {
+                    final value = r.readString();
+                    return MyEnumVariantVariant1(value);
+                }
+                default: throw StateError('Unknown MyEnum variant: $variant');
             }
         }
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String value;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-            serializer.serializeStr(this.value);
-        }
+        const MyEnumVariantVariant1(this.value);
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant1 {
-            const value = deserializer.deserializeStr();
-            return new MyEnumVariantVariant1(value);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(0);
+            w.writeString(this.value);
         }
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -550,54 +528,54 @@ fn enum_with_newtype_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    sealed class MyEnum {
+        const MyEnum();
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantVariant1.load(deserializer);
-                case 1: return MyEnumVariantVariant2.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w);
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final variant = r.readU32();
+            switch (variant) {
+                case 0: {
+                    final value = r.readString();
+                    return MyEnumVariantVariant1(value);
+                }
+                case 1: {
+                    final value = r.readI32();
+                    return MyEnumVariantVariant2(value);
+                }
+                default: throw StateError('Unknown MyEnum variant: $variant');
             }
         }
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String value;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-            serializer.serializeStr(this.value);
-        }
+        const MyEnumVariantVariant1(this.value);
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant1 {
-            const value = deserializer.deserializeStr();
-            return new MyEnumVariantVariant1(value);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(0);
+            w.writeString(this.value);
         }
     }
 
-    export class MyEnumVariantVariant2 extends MyEnum {
-        constructor (public value: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant2 extends MyEnum {
+        final int value;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(1);
-            serializer.serializeI32(this.value);
-        }
+        const MyEnumVariantVariant2(this.value);
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant2 {
-            const value = deserializer.deserializeI32();
-            return new MyEnumVariantVariant2(value);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(1);
+            w.writeI32(this.value);
         }
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -611,60 +589,63 @@ fn enum_with_tuple_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    sealed class MyEnum {
+        const MyEnum();
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantVariant1.load(deserializer);
-                case 1: return MyEnumVariantVariant2.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w);
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final variant = r.readU32();
+            switch (variant) {
+                case 0: {
+                    final field0 = r.readString();
+                    final field1 = r.readI32();
+                    return MyEnumVariantVariant1(field0, field1);
+                }
+                case 1: {
+                    final field0 = r.readBool();
+                    final field1 = r.readF64();
+                    final field2 = r.readU8();
+                    return MyEnumVariantVariant2(field0, field1, field2);
+                }
+                default: throw StateError('Unknown MyEnum variant: $variant');
             }
         }
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public field0: str, public field1: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String field0;
+        final int field1;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-            serializer.serializeStr(this.field0);
-            serializer.serializeI32(this.field1);
-        }
+        const MyEnumVariantVariant1(this.field0, this.field1);
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant1 {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            return new MyEnumVariantVariant1(field0,field1);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(0);
+            w.writeString(this.field0);
+            w.writeI32(this.field1);
         }
     }
 
-    export class MyEnumVariantVariant2 extends MyEnum {
-        constructor (public field0: bool, public field1: float64, public field2: uint8) {
-            super();
-        }
+    final class MyEnumVariantVariant2 extends MyEnum {
+        final bool field0;
+        final double field1;
+        final int field2;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(1);
-            serializer.serializeBool(this.field0);
-            serializer.serializeF64(this.field1);
-            serializer.serializeU8(this.field2);
-        }
+        const MyEnumVariantVariant2(this.field0, this.field1, this.field2);
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant2 {
-            const field0 = deserializer.deserializeBool();
-            const field1 = deserializer.deserializeF64();
-            const field2 = deserializer.deserializeU8();
-            return new MyEnumVariantVariant2(field0,field1,field2);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(1);
+            w.writeBool(this.field0);
+            w.writeF64(this.field1);
+            w.writeU8(this.field2);
         }
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -677,39 +658,41 @@ fn enum_with_struct_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    sealed class MyEnum {
+        const MyEnum();
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantVariant1.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w);
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final variant = r.readU32();
+            switch (variant) {
+                case 0: {
+                    final field1 = r.readString();
+                    final field2 = r.readI32();
+                    return MyEnumVariantVariant1(field1: field1, field2: field2);
+                }
+                default: throw StateError('Unknown MyEnum variant: $variant');
             }
         }
     }
 
-    export class MyEnumVariantVariant1 extends MyEnum {
-        constructor (public field1: str, public field2: int32) {
-            super();
-        }
+    final class MyEnumVariantVariant1 extends MyEnum {
+        final String field1;
+        final int field2;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-            serializer.serializeStr(this.field1);
-            serializer.serializeI32(this.field2);
-        }
+        const MyEnumVariantVariant1({required this.field1, required this.field2});
 
-        static load(deserializer: Deserializer): MyEnumVariantVariant1 {
-            const field1 = deserializer.deserializeStr();
-            const field2 = deserializer.deserializeI32();
-            return new MyEnumVariantVariant1(field1,field2);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(0);
+            w.writeString(this.field1);
+            w.writeI32(this.field2);
         }
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -725,88 +708,83 @@ fn enum_with_mixed_variants() {
     }
 
     let actual = emit!(MyEnum as Dart with Encoding::Bincode).unwrap();
-    insta::assert_snapshot!(actual, @r#"
+    insta::assert_snapshot!(actual, @"
 
 
-    export abstract class MyEnum {
-        abstract serialize(serializer: Serializer): void;
+    sealed class MyEnum {
+        const MyEnum();
 
-        static deserialize(deserializer: Deserializer): MyEnum {
-            const index = deserializer.deserializeVariantIndex();
-            switch (index) {
-                case 0: return MyEnumVariantUnit.load(deserializer);
-                case 1: return MyEnumVariantNewType.load(deserializer);
-                case 2: return MyEnumVariantTuple.load(deserializer);
-                case 3: return MyEnumVariantStruct.load(deserializer);
-                default: throw new Error("Unknown variant index for MyEnum: " + index);
+        void bincodeEncode(BincodeWriter w);
+
+        static MyEnum bincodeDecode(BincodeReader r) {
+            final variant = r.readU32();
+            switch (variant) {
+                case 0: return const MyEnumVariantUnit();
+                case 1: {
+                    final value = r.readString();
+                    return MyEnumVariantNewType(value);
+                }
+                case 2: {
+                    final field0 = r.readString();
+                    final field1 = r.readI32();
+                    return MyEnumVariantTuple(field0, field1);
+                }
+                case 3: {
+                    final field = r.readBool();
+                    return MyEnumVariantStruct(field: field);
+                }
+                default: throw StateError('Unknown MyEnum variant: $variant');
             }
         }
     }
 
-    export class MyEnumVariantUnit extends MyEnum {
-        constructor () {
-            super();
-        }
+    final class MyEnumVariantUnit extends MyEnum {
+        const MyEnumVariantUnit();
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(0);
-        }
-
-        static load(deserializer: Deserializer): MyEnumVariantUnit {
-            return new MyEnumVariantUnit();
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(0);
         }
     }
 
-    export class MyEnumVariantNewType extends MyEnum {
-        constructor (public value: str) {
-            super();
-        }
+    final class MyEnumVariantNewType extends MyEnum {
+        final String value;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(1);
-            serializer.serializeStr(this.value);
-        }
+        const MyEnumVariantNewType(this.value);
 
-        static load(deserializer: Deserializer): MyEnumVariantNewType {
-            const value = deserializer.deserializeStr();
-            return new MyEnumVariantNewType(value);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(1);
+            w.writeString(this.value);
         }
     }
 
-    export class MyEnumVariantTuple extends MyEnum {
-        constructor (public field0: str, public field1: int32) {
-            super();
-        }
+    final class MyEnumVariantTuple extends MyEnum {
+        final String field0;
+        final int field1;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(2);
-            serializer.serializeStr(this.field0);
-            serializer.serializeI32(this.field1);
-        }
+        const MyEnumVariantTuple(this.field0, this.field1);
 
-        static load(deserializer: Deserializer): MyEnumVariantTuple {
-            const field0 = deserializer.deserializeStr();
-            const field1 = deserializer.deserializeI32();
-            return new MyEnumVariantTuple(field0,field1);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(2);
+            w.writeString(this.field0);
+            w.writeI32(this.field1);
         }
     }
 
-    export class MyEnumVariantStruct extends MyEnum {
-        constructor (public field: bool) {
-            super();
-        }
+    final class MyEnumVariantStruct extends MyEnum {
+        final bool field;
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeVariantIndex(3);
-            serializer.serializeBool(this.field);
-        }
+        const MyEnumVariantStruct({required this.field});
 
-        static load(deserializer: Deserializer): MyEnumVariantStruct {
-            const field = deserializer.deserializeBool();
-            return new MyEnumVariantStruct(field);
+        @override
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU32(3);
+            w.writeBool(this.field);
         }
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -822,37 +800,39 @@ fn struct_with_vec_field_1() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public items: Seq<str>, public numbers: Seq<int32>, public nested_items: Seq<Seq<str>>) {
+    final class MyStruct {
+        final List<String> items;
+        final List<int> numbers;
+        final List<List<String>> nested_items;
+
+        const MyStruct({required this.items, required this.numbers, required this.nested_items});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(items.length);
+            for (final _item in items) {
+            w.writeString(_item);
+            }
+            w.writeU64(numbers.length);
+            for (final _item in numbers) {
+            w.writeI32(_item);
+            }
+            w.writeU64(nested_items.length);
+            for (final _item in nested_items) {
+            w.writeU64(_item.length);
+            for (final _item in _item) {
+            w.writeString(_item);
+            }
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeArray(this.items, serializer, (item, serializer) => {
-                serializer.serializeStr(item);
-            });
-            serializeArray(this.numbers, serializer, (item, serializer) => {
-                serializer.serializeI32(item);
-            });
-            serializeArray(this.nested_items, serializer, (item, serializer) => {
-                serializeArray(item, serializer, (item, serializer) => {
-                    serializer.serializeStr(item);
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const items = deserializeArray(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const numbers = deserializeArray(deserializer, (deserializer) => {
-                return deserializer.deserializeI32();
-            });
-            const nested_items = deserializeArray(deserializer, (deserializer) => {
-                return deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeStr();
-                });
-            });
-            return new MyStruct(items,numbers,nested_items);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _items_len = r.readU64();
+            final items = List.generate(_items_len, (_) => r.readString());
+            final _numbers_len = r.readU64();
+            final numbers = List.generate(_numbers_len, (_) => r.readI32());
+            final _nested_items_len = r.readU64();
+            final nested_items = List.generate(_nested_items_len, (_) => (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readString()); })());
+            return MyStruct(items: items, numbers: numbers, nested_items: nested_items);
         }
     }
     ");
@@ -874,40 +854,41 @@ fn struct_with_vec_field_2() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class Child {
-        constructor (public name: str) {
+    final class Child {
+        final String name;
+
+        const Child({required this.name});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(name);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.name);
-        }
-
-        static deserialize(deserializer: Deserializer): Child {
-            const name = deserializer.deserializeStr();
-            return new Child(name);
+        static Child bincodeDecode(BincodeReader r) {
+            final name = r.readString();
+            return Child(name: name);
         }
     }
 
 
-    export class Parent {
-        constructor (public children: Seq<Seq<Child>>) {
+    final class Parent {
+        final List<List<Child>> children;
+
+        const Parent({required this.children});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(children.length);
+            for (final _item in children) {
+            w.writeU64(_item.length);
+            for (final _item in _item) {
+            _item.bincodeEncode(w);
+            }
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeArray(this.children, serializer, (item, serializer) => {
-                serializeArray(item, serializer, (item, serializer) => {
-                    item.serialize(serializer);
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): Parent {
-            const children = deserializeArray(deserializer, (deserializer) => {
-                return deserializeArray(deserializer, (deserializer) => {
-                    return Child.deserialize(deserializer);
-                });
-            });
-            return new Parent(children);
+        static Parent bincodeDecode(BincodeReader r) {
+            final _children_len = r.readU64();
+            final children = List.generate(_children_len, (_) => (() { final _l = r.readU64(); return List.generate(_l, (_) => Child.bincodeDecode(r)); })());
+            return Parent(children: children);
         }
     }
     ");
@@ -915,11 +896,19 @@ fn struct_with_vec_field_2() {
 
 #[test]
 fn struct_with_option_field() {
+    // English: `nested: Option<Option<i32>>` removed for Dart backend — Dart's
+    // `T?` cannot represent all 3 distinct values of Rust nested Option
+    // (None / Some(None) / Some(Some(v))). The emitter now panics on nested
+    // Option to prevent silently-broken code; users should use a custom
+    // wrapper struct if they need this.
+    // 中文:`nested: Option<Option<i32>>` 字段从 Dart 后端的测试中移除 ——
+    // Dart 的 `T?` 无法表达 Rust 嵌套 Option 的 3 种值。emitter 现在会在
+    // 遇到嵌套 Option 时 panic,避免生成静默错误的代码;用户应该用自定义
+    // 包装结构体处理这种情况。
     #[derive(Facet)]
-    #[allow(clippy::struct_field_names, clippy::option_option)]
+    #[allow(clippy::struct_field_names)]
     struct MyStruct {
         simple: Option<String>,
-        nested: Option<Option<i32>>,
         list: Option<Vec<bool>>,
         list_of_options: Vec<Option<bool>>,
     }
@@ -928,51 +917,52 @@ fn struct_with_option_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public simple: Optional<str>, public nested: Optional<Optional<int32>>, public list: Optional<Seq<bool>>, public list_of_options: Seq<Optional<bool>>) {
+    final class MyStruct {
+        final String? simple;
+        final List<bool>? list;
+        final List<bool?> list_of_options;
+
+        const MyStruct({required this.simple, required this.list, required this.list_of_options});
+
+        void bincodeEncode(BincodeWriter w) {
+            if (simple != null) {
+                w.writeU8(1);
+            w.writeString(simple!);
+            } else {
+                w.writeU8(0);
+            }
+            if (list != null) {
+                w.writeU8(1);
+            w.writeU64(list!.length);
+            for (final _item in list!) {
+            w.writeBool(_item);
+            }
+            } else {
+                w.writeU8(0);
+            }
+            w.writeU64(list_of_options.length);
+            for (final _item in list_of_options) {
+            if (_item != null) {
+                w.writeU8(1);
+            w.writeBool(_item!);
+            } else {
+                w.writeU8(0);
+            }
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeOption(this.simple, serializer, (value, serializer) => {
-                serializer.serializeStr(value);
-            });
-            serializeOption(this.nested, serializer, (value, serializer) => {
-                serializeOption(value, serializer, (value, serializer) => {
-                    serializer.serializeI32(value);
-                });
-            });
-            serializeOption(this.list, serializer, (value, serializer) => {
-                serializeArray(value, serializer, (item, serializer) => {
-                    serializer.serializeBool(item);
-                });
-            });
-            serializeArray(this.list_of_options, serializer, (item, serializer) => {
-                serializeOption(item, serializer, (value, serializer) => {
-                    serializer.serializeBool(value);
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const simple = deserializeOption(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const nested = deserializeOption(deserializer, (deserializer) => {
-                return deserializeOption(deserializer, (deserializer) => {
-                    return deserializer.deserializeI32();
-                });
-            });
-            const list = deserializeOption(deserializer, (deserializer) => {
-                return deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeBool();
-                });
-            });
-            const list_of_options = deserializeArray(deserializer, (deserializer) => {
-                return deserializeOption(deserializer, (deserializer) => {
-                    return deserializer.deserializeBool();
-                });
-            });
-            return new MyStruct(simple,nested,list,list_of_options);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _simple_tag = r.readU8();
+            final simple = _simple_tag == 1
+                ? r.readString()
+                : null;
+            final _list_tag = r.readU8();
+            final list = _list_tag == 1
+                ? (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readBool()); })()
+                : null;
+            final _list_of_options_len = r.readU64();
+            final list_of_options = List.generate(_list_of_options_len, (_) => (() { final _t = r.readU8(); return _t == 1 ? r.readBool() : null; })());
+            return MyStruct(simple: simple, list: list, list_of_options: list_of_options);
         }
     }
     ");
@@ -990,33 +980,37 @@ fn struct_with_hashmap_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_to_int: Map<str,int32>, public int_to_bool: Map<int32,bool>) {
+    final class MyStruct {
+        final Map<String, int> string_to_int;
+        final Map<int, bool> int_to_bool;
+
+        const MyStruct({required this.string_to_int, required this.int_to_bool});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(string_to_int.length);
+            for (final _entry in string_to_int.entries) {
+            w.writeString(_entry.key);
+            w.writeI32(_entry.value);
+            }
+            w.writeU64(int_to_bool.length);
+            for (final _entry in int_to_bool.entries) {
+            w.writeI32(_entry.key);
+            w.writeBool(_entry.value);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeMap(this.string_to_int, serializer, (key, value, serializer) => {
-                serializer.serializeStr(key);
-                serializer.serializeI32(value);
-            });
-            serializeMap(this.int_to_bool, serializer, (key, value, serializer) => {
-                serializer.serializeI32(key);
-                serializer.serializeBool(value);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const string_to_int = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeStr();
-                const value = deserializer.deserializeI32();
-                return [key, value];
-            });
-            const int_to_bool = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeI32();
-                const value = deserializer.deserializeBool();
-                return [key, value];
-            });
-            return new MyStruct(string_to_int,int_to_bool);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _string_to_int_len = r.readU64();
+            final string_to_int = {
+                for (var _i = 0; _i < _string_to_int_len; _i++)
+                    r.readString(): r.readI32(),
+            };
+            final _int_to_bool_len = r.readU64();
+            final int_to_bool = {
+                for (var _i = 0; _i < _int_to_bool_len; _i++)
+                    r.readI32(): r.readBool(),
+            };
+            return MyStruct(string_to_int: string_to_int, int_to_bool: int_to_bool);
         }
     }
     ");
@@ -1037,82 +1031,89 @@ fn struct_with_nested_generics() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public optional_list: Optional<Seq<str>>, public list_of_optionals: Seq<Optional<int32>>, public map_to_list: Map<str,Seq<bool>>, public optional_map: Optional<Map<str,int32>>, public complex: Seq<Optional<Map<str,Seq<bool>>>>) {
+    final class MyStruct {
+        final List<String>? optional_list;
+        final List<int?> list_of_optionals;
+        final Map<String, List<bool>> map_to_list;
+        final Map<String, int>? optional_map;
+        final List<Map<String, List<bool>>?> complex;
+
+        const MyStruct({required this.optional_list, required this.list_of_optionals, required this.map_to_list, required this.optional_map, required this.complex});
+
+        void bincodeEncode(BincodeWriter w) {
+            if (optional_list != null) {
+                w.writeU8(1);
+            w.writeU64(optional_list!.length);
+            for (final _item in optional_list!) {
+            w.writeString(_item);
+            }
+            } else {
+                w.writeU8(0);
+            }
+            w.writeU64(list_of_optionals.length);
+            for (final _item in list_of_optionals) {
+            if (_item != null) {
+                w.writeU8(1);
+            w.writeI32(_item!);
+            } else {
+                w.writeU8(0);
+            }
+            }
+            w.writeU64(map_to_list.length);
+            for (final _entry in map_to_list.entries) {
+            w.writeString(_entry.key);
+            w.writeU64(_entry.value.length);
+            for (final _item in _entry.value) {
+            w.writeBool(_item);
+            }
+            }
+            if (optional_map != null) {
+                w.writeU8(1);
+            w.writeU64(optional_map!.length);
+            for (final _entry in optional_map!.entries) {
+            w.writeString(_entry.key);
+            w.writeI32(_entry.value);
+            }
+            } else {
+                w.writeU8(0);
+            }
+            w.writeU64(complex.length);
+            for (final _item in complex) {
+            if (_item != null) {
+                w.writeU8(1);
+            w.writeU64(_item!.length);
+            for (final _entry in _item!.entries) {
+            w.writeString(_entry.key);
+            w.writeU64(_entry.value.length);
+            for (final _item in _entry.value) {
+            w.writeBool(_item);
+            }
+            }
+            } else {
+                w.writeU8(0);
+            }
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeOption(this.optional_list, serializer, (value, serializer) => {
-                serializeArray(value, serializer, (item, serializer) => {
-                    serializer.serializeStr(item);
-                });
-            });
-            serializeArray(this.list_of_optionals, serializer, (item, serializer) => {
-                serializeOption(item, serializer, (value, serializer) => {
-                    serializer.serializeI32(value);
-                });
-            });
-            serializeMap(this.map_to_list, serializer, (key, value, serializer) => {
-                serializer.serializeStr(key);
-                serializeArray(value, serializer, (item, serializer) => {
-                    serializer.serializeBool(item);
-                });
-            });
-            serializeOption(this.optional_map, serializer, (value, serializer) => {
-                serializeMap(value, serializer, (key, value, serializer) => {
-                    serializer.serializeStr(key);
-                    serializer.serializeI32(value);
-                });
-            });
-            serializeArray(this.complex, serializer, (item, serializer) => {
-                serializeOption(item, serializer, (value, serializer) => {
-                    serializeMap(value, serializer, (key, value, serializer) => {
-                        serializer.serializeStr(key);
-                        serializeArray(value, serializer, (item, serializer) => {
-                            serializer.serializeBool(item);
-                        });
-                    });
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const optional_list = deserializeOption(deserializer, (deserializer) => {
-                return deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeStr();
-                });
-            });
-            const list_of_optionals = deserializeArray(deserializer, (deserializer) => {
-                return deserializeOption(deserializer, (deserializer) => {
-                    return deserializer.deserializeI32();
-                });
-            });
-            const map_to_list = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeStr();
-                const value = deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeBool();
-                });
-                return [key, value];
-            });
-            const optional_map = deserializeOption(deserializer, (deserializer) => {
-                return deserializeMap(deserializer, (deserializer) => {
-                    const key = deserializer.deserializeStr();
-                    const value = deserializer.deserializeI32();
-                    return [key, value];
-                });
-            });
-            const complex = deserializeArray(deserializer, (deserializer) => {
-                return deserializeOption(deserializer, (deserializer) => {
-                    return deserializeMap(deserializer, (deserializer) => {
-                        const key = deserializer.deserializeStr();
-                        const value = deserializeArray(deserializer, (deserializer) => {
-                            return deserializer.deserializeBool();
-                        });
-                        return [key, value];
-                    });
-                });
-            });
-            return new MyStruct(optional_list,list_of_optionals,map_to_list,optional_map,complex);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _optional_list_tag = r.readU8();
+            final optional_list = _optional_list_tag == 1
+                ? (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readString()); })()
+                : null;
+            final _list_of_optionals_len = r.readU64();
+            final list_of_optionals = List.generate(_list_of_optionals_len, (_) => (() { final _t = r.readU8(); return _t == 1 ? r.readI32() : null; })());
+            final _map_to_list_len = r.readU64();
+            final map_to_list = {
+                for (var _i = 0; _i < _map_to_list_len; _i++)
+                    r.readString(): (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readBool()); })(),
+            };
+            final _optional_map_tag = r.readU8();
+            final optional_map = _optional_map_tag == 1
+                ? (() { final _l = r.readU64(); return { for (var _i = 0; _i < _l; _i++) r.readString(): r.readI32() }; })()
+                : null;
+            final _complex_len = r.readU64();
+            final complex = List.generate(_complex_len, (_) => (() { final _t = r.readU8(); return _t == 1 ? (() { final _l = r.readU64(); return { for (var _i = 0; _i < _l; _i++) r.readString(): (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readBool()); })() }; })() : null; })());
+            return MyStruct(optional_list: optional_list, list_of_optionals: list_of_optionals, map_to_list: map_to_list, optional_map: optional_map, complex: complex);
         }
     }
     ");
@@ -1132,36 +1133,33 @@ fn struct_with_array_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public fixed_array: ListTuple<[int32]>, public byte_array: ListTuple<[uint8]>, public string_array: ListTuple<[str]>) {
+    final class MyStruct {
+        final List<int> fixed_array;
+        final List<int> byte_array;
+        final List<String> string_array;
+
+        const MyStruct({required this.fixed_array, required this.byte_array, required this.string_array});
+
+        void bincodeEncode(BincodeWriter w) {
+            // TupleArray: fixed size 5, no length prefix
+            for (var _i = 0; _i < 5; _i++) { final _item = fixed_array[_i];
+            w.writeI32(_item);
+            }
+            // TupleArray: fixed size 32, no length prefix
+            for (var _i = 0; _i < 32; _i++) { final _item = byte_array[_i];
+            w.writeU8(_item);
+            }
+            // TupleArray: fixed size 3, no length prefix
+            for (var _i = 0; _i < 3; _i++) { final _item = string_array[_i];
+            w.writeString(_item);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeTupleArray(this.fixed_array, serializer, (item, serializer) => {
-                serializer.serializeI32(item[0]);
-            });
-            serializeTupleArray(this.byte_array, serializer, (item, serializer) => {
-                serializer.serializeU8(item[0]);
-            });
-            serializeTupleArray(this.string_array, serializer, (item, serializer) => {
-                serializer.serializeStr(item[0]);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const fixed_array = deserializeTupleArray(deserializer, 5, (deserializer) => {
-                const item = deserializer.deserializeI32();
-                return [item];
-            });
-            const byte_array = deserializeTupleArray(deserializer, 32, (deserializer) => {
-                const item = deserializer.deserializeU8();
-                return [item];
-            });
-            const string_array = deserializeTupleArray(deserializer, 3, (deserializer) => {
-                const item = deserializer.deserializeStr();
-                return [item];
-            });
-            return new MyStruct(fixed_array,byte_array,string_array);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final fixed_array = List.generate(5, (_) => r.readI32());
+            final byte_array = List.generate(32, (_) => r.readU8());
+            final string_array = List.generate(3, (_) => r.readString());
+            return MyStruct(fixed_array: fixed_array, byte_array: byte_array, string_array: string_array);
         }
     }
     ");
@@ -1179,33 +1177,37 @@ fn struct_with_btreemap_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_to_int: Map<str,int32>, public int_to_bool: Map<int32,bool>) {
+    final class MyStruct {
+        final Map<String, int> string_to_int;
+        final Map<int, bool> int_to_bool;
+
+        const MyStruct({required this.string_to_int, required this.int_to_bool});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(string_to_int.length);
+            for (final _entry in string_to_int.entries) {
+            w.writeString(_entry.key);
+            w.writeI32(_entry.value);
+            }
+            w.writeU64(int_to_bool.length);
+            for (final _entry in int_to_bool.entries) {
+            w.writeI32(_entry.key);
+            w.writeBool(_entry.value);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeMap(this.string_to_int, serializer, (key, value, serializer) => {
-                serializer.serializeStr(key);
-                serializer.serializeI32(value);
-            });
-            serializeMap(this.int_to_bool, serializer, (key, value, serializer) => {
-                serializer.serializeI32(key);
-                serializer.serializeBool(value);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const string_to_int = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeStr();
-                const value = deserializer.deserializeI32();
-                return [key, value];
-            });
-            const int_to_bool = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeI32();
-                const value = deserializer.deserializeBool();
-                return [key, value];
-            });
-            return new MyStruct(string_to_int,int_to_bool);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _string_to_int_len = r.readU64();
+            final string_to_int = {
+                for (var _i = 0; _i < _string_to_int_len; _i++)
+                    r.readString(): r.readI32(),
+            };
+            final _int_to_bool_len = r.readU64();
+            final int_to_bool = {
+                for (var _i = 0; _i < _int_to_bool_len; _i++)
+                    r.readI32(): r.readBool(),
+            };
+            return MyStruct(string_to_int: string_to_int, int_to_bool: int_to_bool);
         }
     }
     ");
@@ -1223,41 +1225,40 @@ fn struct_with_nested_map_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public map_to_list: Map<str,Seq<int32>>, public list_to_map: Seq<Map<int32,str>>) {
+    final class MyStruct {
+        final Map<String, List<int>> map_to_list;
+        final List<Map<int, String>> list_to_map;
+
+        const MyStruct({required this.map_to_list, required this.list_to_map});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(map_to_list.length);
+            for (final _entry in map_to_list.entries) {
+            w.writeString(_entry.key);
+            w.writeU64(_entry.value.length);
+            for (final _item in _entry.value) {
+            w.writeI32(_item);
+            }
+            }
+            w.writeU64(list_to_map.length);
+            for (final _item in list_to_map) {
+            w.writeU64(_item.length);
+            for (final _entry in _item.entries) {
+            w.writeI32(_entry.key);
+            w.writeString(_entry.value);
+            }
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeMap(this.map_to_list, serializer, (key, value, serializer) => {
-                serializer.serializeStr(key);
-                serializeArray(value, serializer, (item, serializer) => {
-                    serializer.serializeI32(item);
-                });
-            });
-            serializeArray(this.list_to_map, serializer, (item, serializer) => {
-                serializeMap(item, serializer, (key, value, serializer) => {
-                    serializer.serializeI32(key);
-                    serializer.serializeStr(value);
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const map_to_list = deserializeMap(deserializer, (deserializer) => {
-                const key = deserializer.deserializeStr();
-                const value = deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeI32();
-                });
-                return [key, value];
-            });
-            const list_to_map = deserializeArray(deserializer, (deserializer) => {
-                return deserializeMap(deserializer, (deserializer) => {
-                    const key = deserializer.deserializeI32();
-                    const value = deserializer.deserializeStr();
-                    return [key, value];
-                });
-            });
-            return new MyStruct(map_to_list,list_to_map);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _map_to_list_len = r.readU64();
+            final map_to_list = {
+                for (var _i = 0; _i < _map_to_list_len; _i++)
+                    r.readString(): (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readI32()); })(),
+            };
+            final _list_to_map_len = r.readU64();
+            final list_to_map = List.generate(_list_to_map_len, (_) => (() { final _l = r.readU64(); return { for (var _i = 0; _i < _l; _i++) r.readI32(): r.readString() }; })());
+            return MyStruct(map_to_list: map_to_list, list_to_map: list_to_map);
         }
     }
     ");
@@ -1275,27 +1276,29 @@ fn struct_with_hashset_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_set: Seq<str>, public int_set: Seq<int32>) {
+    final class MyStruct {
+        final List<String> string_set;
+        final List<int> int_set;
+
+        const MyStruct({required this.string_set, required this.int_set});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(string_set.length);
+            for (final _item in string_set) {
+            w.writeString(_item);
+            }
+            w.writeU64(int_set.length);
+            for (final _item in int_set) {
+            w.writeI32(_item);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeSet(this.string_set, serializer, (item, serializer) => {
-                serializer.serializeStr(item);
-            });
-            serializeSet(this.int_set, serializer, (item, serializer) => {
-                serializer.serializeI32(item);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const string_set = deserializeSet(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const int_set = deserializeSet(deserializer, (deserializer) => {
-                return deserializer.deserializeI32();
-            });
-            return new MyStruct(string_set,int_set);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _string_set_len = r.readU64();
+            final string_set = List.generate(_string_set_len, (_) => r.readString());
+            final _int_set_len = r.readU64();
+            final int_set = List.generate(_int_set_len, (_) => r.readI32());
+            return MyStruct(string_set: string_set, int_set: int_set);
         }
     }
     ");
@@ -1313,27 +1316,29 @@ fn struct_with_btreeset_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public string_set: Seq<str>, public int_set: Seq<int32>) {
+    final class MyStruct {
+        final List<String> string_set;
+        final List<int> int_set;
+
+        const MyStruct({required this.string_set, required this.int_set});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(string_set.length);
+            for (final _item in string_set) {
+            w.writeString(_item);
+            }
+            w.writeU64(int_set.length);
+            for (final _item in int_set) {
+            w.writeI32(_item);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeSet(this.string_set, serializer, (item, serializer) => {
-                serializer.serializeStr(item);
-            });
-            serializeSet(this.int_set, serializer, (item, serializer) => {
-                serializer.serializeI32(item);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const string_set = deserializeSet(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const int_set = deserializeSet(deserializer, (deserializer) => {
-                return deserializer.deserializeI32();
-            });
-            return new MyStruct(string_set,int_set);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _string_set_len = r.readU64();
+            final string_set = List.generate(_string_set_len, (_) => r.readString());
+            final _int_set_len = r.readU64();
+            final int_set = List.generate(_int_set_len, (_) => r.readI32());
+            return MyStruct(string_set: string_set, int_set: int_set);
         }
     }
     ");
@@ -1351,31 +1356,32 @@ fn struct_with_nested_set_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public vec_of_sets: Seq<Seq<str>>, public set_of_ints: Seq<int32>) {
+    final class MyStruct {
+        final List<List<String>> vec_of_sets;
+        final List<int> set_of_ints;
+
+        const MyStruct({required this.vec_of_sets, required this.set_of_ints});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(vec_of_sets.length);
+            for (final _item in vec_of_sets) {
+            w.writeU64(_item.length);
+            for (final _item in _item) {
+            w.writeString(_item);
+            }
+            }
+            w.writeU64(set_of_ints.length);
+            for (final _item in set_of_ints) {
+            w.writeI32(_item);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeArray(this.vec_of_sets, serializer, (item, serializer) => {
-                serializeSet(item, serializer, (item, serializer) => {
-                    serializer.serializeStr(item);
-                });
-            });
-            serializeSet(this.set_of_ints, serializer, (item, serializer) => {
-                serializer.serializeI32(item);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const vec_of_sets = deserializeArray(deserializer, (deserializer) => {
-                return deserializeSet(deserializer, (deserializer) => {
-                    return deserializer.deserializeStr();
-                });
-            });
-            const set_of_ints = deserializeSet(deserializer, (deserializer) => {
-                return deserializer.deserializeI32();
-            });
-            return new MyStruct(vec_of_sets,set_of_ints);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _vec_of_sets_len = r.readU64();
+            final vec_of_sets = List.generate(_vec_of_sets_len, (_) => (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readString()); })());
+            final _set_of_ints_len = r.readU64();
+            final set_of_ints = List.generate(_set_of_ints_len, (_) => r.readI32());
+            return MyStruct(vec_of_sets: vec_of_sets, set_of_ints: set_of_ints);
         }
     }
     ");
@@ -1394,19 +1400,21 @@ fn struct_with_box_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public boxed_string: str, public boxed_int: int32) {
+    final class MyStruct {
+        final String boxed_string;
+        final int boxed_int;
+
+        const MyStruct({required this.boxed_string, required this.boxed_int});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(boxed_string);
+            w.writeI32(boxed_int);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.boxed_string);
-            serializer.serializeI32(this.boxed_int);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const boxed_string = deserializer.deserializeStr();
-            const boxed_int = deserializer.deserializeI32();
-            return new MyStruct(boxed_string,boxed_int);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final boxed_string = r.readString();
+            final boxed_int = r.readI32();
+            return MyStruct(boxed_string: boxed_string, boxed_int: boxed_int);
         }
     }
     ");
@@ -1424,19 +1432,21 @@ fn struct_with_rc_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public rc_string: str, public rc_int: int32) {
+    final class MyStruct {
+        final String rc_string;
+        final int rc_int;
+
+        const MyStruct({required this.rc_string, required this.rc_int});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(rc_string);
+            w.writeI32(rc_int);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.rc_string);
-            serializer.serializeI32(this.rc_int);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const rc_string = deserializer.deserializeStr();
-            const rc_int = deserializer.deserializeI32();
-            return new MyStruct(rc_string,rc_int);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final rc_string = r.readString();
+            final rc_int = r.readI32();
+            return MyStruct(rc_string: rc_string, rc_int: rc_int);
         }
     }
     ");
@@ -1454,19 +1464,21 @@ fn struct_with_arc_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public arc_string: str, public arc_int: int32) {
+    final class MyStruct {
+        final String arc_string;
+        final int arc_int;
+
+        const MyStruct({required this.arc_string, required this.arc_int});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeString(arc_string);
+            w.writeI32(arc_int);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeStr(this.arc_string);
-            serializer.serializeI32(this.arc_int);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const arc_string = deserializer.deserializeStr();
-            const arc_int = deserializer.deserializeI32();
-            return new MyStruct(arc_string,arc_int);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final arc_string = r.readString();
+            final arc_int = r.readI32();
+            return MyStruct(arc_string: arc_string, arc_int: arc_int);
         }
     }
     ");
@@ -1488,57 +1500,64 @@ fn struct_with_mixed_collections_and_pointers() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public vec_of_sets: Seq<Seq<str>>, public optional_btree: Optional<Map<str,int32>>, public boxed_vec: Seq<str>, public arc_option: Optional<str>, public array_of_boxes: ListTuple<[int32]>) {
+    final class MyStruct {
+        final List<List<String>> vec_of_sets;
+        final Map<String, int>? optional_btree;
+        final List<String> boxed_vec;
+        final String? arc_option;
+        final List<int> array_of_boxes;
+
+        const MyStruct({required this.vec_of_sets, required this.optional_btree, required this.boxed_vec, required this.arc_option, required this.array_of_boxes});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(vec_of_sets.length);
+            for (final _item in vec_of_sets) {
+            w.writeU64(_item.length);
+            for (final _item in _item) {
+            w.writeString(_item);
+            }
+            }
+            if (optional_btree != null) {
+                w.writeU8(1);
+            w.writeU64(optional_btree!.length);
+            for (final _entry in optional_btree!.entries) {
+            w.writeString(_entry.key);
+            w.writeI32(_entry.value);
+            }
+            } else {
+                w.writeU8(0);
+            }
+            w.writeU64(boxed_vec.length);
+            for (final _item in boxed_vec) {
+            w.writeString(_item);
+            }
+            if (arc_option != null) {
+                w.writeU8(1);
+            w.writeString(arc_option!);
+            } else {
+                w.writeU8(0);
+            }
+            // TupleArray: fixed size 3, no length prefix
+            for (var _i = 0; _i < 3; _i++) { final _item = array_of_boxes[_i];
+            w.writeI32(_item);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializeArray(this.vec_of_sets, serializer, (item, serializer) => {
-                serializeSet(item, serializer, (item, serializer) => {
-                    serializer.serializeStr(item);
-                });
-            });
-            serializeOption(this.optional_btree, serializer, (value, serializer) => {
-                serializeMap(value, serializer, (key, value, serializer) => {
-                    serializer.serializeStr(key);
-                    serializer.serializeI32(value);
-                });
-            });
-            serializeArray(this.boxed_vec, serializer, (item, serializer) => {
-                serializer.serializeStr(item);
-            });
-            serializeOption(this.arc_option, serializer, (value, serializer) => {
-                serializer.serializeStr(value);
-            });
-            serializeTupleArray(this.array_of_boxes, serializer, (item, serializer) => {
-                serializer.serializeI32(item[0]);
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const vec_of_sets = deserializeArray(deserializer, (deserializer) => {
-                return deserializeSet(deserializer, (deserializer) => {
-                    return deserializer.deserializeStr();
-                });
-            });
-            const optional_btree = deserializeOption(deserializer, (deserializer) => {
-                return deserializeMap(deserializer, (deserializer) => {
-                    const key = deserializer.deserializeStr();
-                    const value = deserializer.deserializeI32();
-                    return [key, value];
-                });
-            });
-            const boxed_vec = deserializeArray(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const arc_option = deserializeOption(deserializer, (deserializer) => {
-                return deserializer.deserializeStr();
-            });
-            const array_of_boxes = deserializeTupleArray(deserializer, 3, (deserializer) => {
-                const item = deserializer.deserializeI32();
-                return [item];
-            });
-            return new MyStruct(vec_of_sets,optional_btree,boxed_vec,arc_option,array_of_boxes);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final _vec_of_sets_len = r.readU64();
+            final vec_of_sets = List.generate(_vec_of_sets_len, (_) => (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readString()); })());
+            final _optional_btree_tag = r.readU8();
+            final optional_btree = _optional_btree_tag == 1
+                ? (() { final _l = r.readU64(); return { for (var _i = 0; _i < _l; _i++) r.readString(): r.readI32() }; })()
+                : null;
+            final _boxed_vec_len = r.readU64();
+            final boxed_vec = List.generate(_boxed_vec_len, (_) => r.readString());
+            final _arc_option_tag = r.readU8();
+            final arc_option = _arc_option_tag == 1
+                ? r.readString()
+                : null;
+            final array_of_boxes = List.generate(3, (_) => r.readI32());
+            return MyStruct(vec_of_sets: vec_of_sets, optional_btree: optional_btree, boxed_vec: boxed_vec, arc_option: arc_option, array_of_boxes: array_of_boxes);
         }
     }
     ");
@@ -1559,21 +1578,26 @@ fn struct_with_bytes_field() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public data: bytes, public name: str, public header: bytes) {
+    final class MyStruct {
+        final Uint8List data;
+        final String name;
+        final Uint8List header;
+
+        const MyStruct({required this.data, required this.name, required this.header});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(data.length);
+            w.writeBytes(data);
+            w.writeString(name);
+            w.writeU64(header.length);
+            w.writeBytes(header);
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeBytes(this.data);
-            serializer.serializeStr(this.name);
-            serializer.serializeBytes(this.header);
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const data = deserializer.deserializeBytes();
-            const name = deserializer.deserializeStr();
-            const header = deserializer.deserializeBytes();
-            return new MyStruct(data,name,header);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final data = (() { final _l = r.readU64(); return r.readBytes(_l); })();
+            final name = r.readString();
+            final header = (() { final _l = r.readU64(); return r.readBytes(_l); })();
+            return MyStruct(data: data, name: name, header: header);
         }
     }
     ");
@@ -1595,31 +1619,40 @@ fn struct_with_bytes_field_and_slice() {
     insta::assert_snapshot!(actual, @"
 
 
-    export class MyStruct {
-        constructor (public data: bytes, public name: str, public header: bytes, public optional_bytes: Optional<Seq<uint8>>) {
+    final class MyStruct {
+        final Uint8List data;
+        final String name;
+        final Uint8List header;
+        final List<int>? optional_bytes;
+
+        const MyStruct({required this.data, required this.name, required this.header, required this.optional_bytes});
+
+        void bincodeEncode(BincodeWriter w) {
+            w.writeU64(data.length);
+            w.writeBytes(data);
+            w.writeString(name);
+            w.writeU64(header.length);
+            w.writeBytes(header);
+            if (optional_bytes != null) {
+                w.writeU8(1);
+            w.writeU64(optional_bytes!.length);
+            for (final _item in optional_bytes!) {
+            w.writeU8(_item);
+            }
+            } else {
+                w.writeU8(0);
+            }
         }
 
-        public serialize(serializer: Serializer): void {
-            serializer.serializeBytes(this.data);
-            serializer.serializeStr(this.name);
-            serializer.serializeBytes(this.header);
-            serializeOption(this.optional_bytes, serializer, (value, serializer) => {
-                serializeArray(value, serializer, (item, serializer) => {
-                    serializer.serializeU8(item);
-                });
-            });
-        }
-
-        static deserialize(deserializer: Deserializer): MyStruct {
-            const data = deserializer.deserializeBytes();
-            const name = deserializer.deserializeStr();
-            const header = deserializer.deserializeBytes();
-            const optional_bytes = deserializeOption(deserializer, (deserializer) => {
-                return deserializeArray(deserializer, (deserializer) => {
-                    return deserializer.deserializeU8();
-                });
-            });
-            return new MyStruct(data,name,header,optional_bytes);
+        static MyStruct bincodeDecode(BincodeReader r) {
+            final data = (() { final _l = r.readU64(); return r.readBytes(_l); })();
+            final name = r.readString();
+            final header = (() { final _l = r.readU64(); return r.readBytes(_l); })();
+            final _optional_bytes_tag = r.readU8();
+            final optional_bytes = _optional_bytes_tag == 1
+                ? (() { final _l = r.readU64(); return List.generate(_l, (_) => r.readU8()); })()
+                : null;
+            return MyStruct(data: data, name: name, header: header, optional_bytes: optional_bytes);
         }
     }
     ");

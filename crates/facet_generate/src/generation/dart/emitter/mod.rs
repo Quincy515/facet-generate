@@ -176,10 +176,14 @@ impl Emitter<Dart> for Doc {
 /// parameters. Dart allows both, but different Rust container shapes map to
 /// different idiomatic choices.
 ///
+/// Marked `pub` so the bincode/json plugins (which generate decode code that
+/// invokes the constructor) can pick the matching argument style.
+///
 /// 中文:控制生成的 Dart 构造器用位置参数还是命名参数。Dart 两种都支持,但
-/// 不同的 Rust 容器形状对应不同的 Dart 习惯用法。
+/// 不同的 Rust 容器形状对应不同的 Dart 习惯用法。标记为 `pub` 是为了让
+/// bincode/json plugin(生成调用构造器的 decode 代码)能选择匹配的参数风格。
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum FieldLayout {
+pub enum FieldLayout {
     /// English: No fields — emits `const Foo();`
     /// 中文:无字段 —— 生成 `const Foo();`
     Unit,
@@ -194,6 +198,40 @@ enum FieldLayout {
     /// 中文:命名参数 —— 生成 `const Foo({required this.a, required this.b});`
     /// 用于带真实字段名的 Rust Struct 变体。
     Named,
+}
+
+impl FieldLayout {
+    /// English: Derive `FieldLayout` from a top-level [`ContainerFormat`].
+    /// Useful for plugins that need to know how the container's constructor
+    /// will be called.
+    /// 中文:从顶层 [`ContainerFormat`] 推导 `FieldLayout`,供需要知道容器
+    /// 构造器调用风格的 plugin 使用。
+    #[must_use]
+    pub fn from_container(fmt: &ContainerFormat) -> Self {
+        match fmt {
+            ContainerFormat::UnitStruct(_) => Self::Unit,
+            ContainerFormat::NewTypeStruct(..) | ContainerFormat::TupleStruct(..) => {
+                Self::Positional
+            }
+            ContainerFormat::Struct(..) => Self::Named,
+            // English: Enums don't have a "container" constructor; variant
+            // subclasses do, and they should call FieldLayout::from_variant.
+            // 中文:enum 本身没有"容器"构造器;变体子类有,应该调用 from_variant。
+            ContainerFormat::Enum(..) => Self::Unit,
+        }
+    }
+
+    /// English: Derive `FieldLayout` from a [`VariantFormat`] (enum variant).
+    /// 中文:从 [`VariantFormat`](enum 变体)推导 `FieldLayout`。
+    #[must_use]
+    pub fn from_variant(fmt: &VariantFormat) -> Self {
+        match fmt {
+            VariantFormat::Unit => Self::Unit,
+            VariantFormat::NewType(_) | VariantFormat::Tuple(_) => Self::Positional,
+            VariantFormat::Struct(_) => Self::Named,
+            VariantFormat::Variable(_) => panic!("unexpected Variable variant"),
+        }
+    }
 }
 
 impl Emitter<Dart> for Container<'_> {
@@ -274,9 +312,23 @@ impl Emitter<Dart> for Format {
             // 中文:字节数组映射到 dart:typed_data 的 Uint8List
             Self::Bytes => write!(w, "Uint8List"),
 
-            // English: Dart 3 native nullable syntax (T?)
-            // 中文:Dart 3 原生可空语法 (T?)
+            // English: Dart 3 native nullable syntax (T?).
+            // Nested `Option<Option<T>>` cannot be represented in Dart's null
+            // semantics: Rust has 3 distinct values (None / Some(None) / Some(Some(v)))
+            // but Dart's `T?` only has 2 (null / T). We panic with a clear error
+            // directing users to use a custom wrapper type instead.
+            // 中文:Dart 3 原生可空语法 (T?)。嵌套 `Option<Option<T>>` 在 Dart
+            // 可空语义下无法表达:Rust 有 3 种值,Dart `T?` 只有 2 种。此时 panic
+            // 并给出清晰错误,建议用户改用自定义包装类型。
             Self::Option(format) => {
+                if matches!(format.as_ref(), Self::Option(_)) {
+                    panic!(
+                        "Dart backend: nested Option<Option<T>> is not supported \
+                         — Rust has 3 distinct values but Dart's `T?` only has 2. \
+                         Use a custom wrapper struct if you need to distinguish \
+                         `None` from `Some(None)`."
+                    );
+                }
                 format.write(w, lang)?;
                 write!(w, "?")
             }
@@ -333,12 +385,14 @@ impl Emitter<Dart> for Named<Format> {
 /// This is a minimal conservative list — Dart's full keyword list is longer
 /// but most keywords are not plausible Rust field names.
 ///
+/// Marked `pub(crate)` so the bincode/json plugins can emit matching field
+/// references when generating encode/decode method bodies.
+///
 /// 中文:Dart 有一组保留字(`class`、`final`、`const`、`is`、`as`、`in`、
 /// `switch` 等)和内置标识符,不能直接用作变量名。如果 Rust 源类型有字段名
-/// 和这些冲突,后缀加 `_` 使其成为合法 Dart 标识符。这里保留的是一个最小
-/// 的保守列表——Dart 的完整关键字列表更长,但大多数不太可能出现在 Rust
-/// 字段名里。
-fn sanitize_dart_ident(name: &str) -> String {
+/// 和这些冲突,后缀加 `_` 使其成为合法 Dart 标识符。标记为 `pub(crate)`
+/// 以便 bincode/json plugin 在生成 encode/decode 方法体时发出匹配的字段引用。
+pub(crate) fn sanitize_dart_ident(name: &str) -> String {
     // Conservative list of Dart reserved words and built-ins that are plausible
     // as Rust field names. Dart identifiers can contain `$` and start with `_`,
     // but an `_` prefix makes the field library-private — not what we want. So
@@ -592,16 +646,15 @@ fn output_enum_container<W: IndentWrite>(
 // 原生的 `int`/`bool`/`double`/`String`/`List<T>`/`Map<K,V>`/`T?`/`Uint8List`,
 // 不需要像 TypeScript 那样写 `type int32 = number` 之类的别名来提升可读性。
 
-// English: Emitter tests re-enabled for Step 3 verification — snapshots will be
-// updated via `INSTA_UPDATE=always cargo test` once the output is verified correct.
-// tests_bincode still disabled (DartBincodePlugin is TS-style pending Step 5b).
-// 中文:Step 3 验证阶段重新启用 emitter 测试 —— snapshot 会用
-// `INSTA_UPDATE=always cargo test` 批量更新(输出确认正确后)。
-// tests_bincode 仍禁用(DartBincodePlugin 是 TS 风格,待 Step 5b 重写)。
+// English: tests.rs covers Encoding::None pure-type output (verified in Step 3).
+// tests_bincode.rs covers BincodePlugin output — re-enabled in Step 5b, snapshots
+// need bulk regeneration via `INSTA_UPDATE=always cargo test` + spot-check + accept.
+// tests_json.rs was deleted — will be re-added in Step 5c when DartJsonPlugin ships.
+// 中文:tests.rs 覆盖 Encoding::None 纯类型输出(Step 3 已验证)。
+// tests_bincode.rs 覆盖 BincodePlugin 输出(Step 5b 重新启用)。
+// tests_json.rs 在 Step 5c 实现 DartJsonPlugin 时重新加入。
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
-// #[cfg(test)]
-// mod tests_bincode;
-// #[cfg(test)]
-// mod tests_json;
+#[cfg(test)]
+mod tests_bincode;

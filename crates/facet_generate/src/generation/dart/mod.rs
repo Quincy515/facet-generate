@@ -26,7 +26,8 @@
 //!    registry by namespace into per-module files, and generates a
 //!    `package.json` manifest.
 
-pub use emitter::Dart;
+pub use emitter::{Dart, FieldLayout};
+pub(crate) use emitter::sanitize_dart_ident;
 pub use generator::DartCodeGenerator;
 pub use installer::Installer;
 
