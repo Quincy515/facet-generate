@@ -1,0 +1,29 @@
+name: d_bincode
+description: >
+  A performant Dart implementation of the Bincode binary serialization format.
+  Requires manual implementation for encoding/decoding custom types.
+version: 3.2.0
+license: 'MIT'
+
+homepage: https://github.com/Binurie/d_bincode
+repository: https://github.com/Binurie/d_bincode
+issue_tracker: https://github.com/Binurie/d_bincode/issues
+documentation: https://github.com/Binurie/d_bincode#readme
+topics:
+  - serialization
+  - bincode
+  - binary
+  - dart
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+
+dev_dependencies:
+  lints: ^5.1.1
+  intl: ^0.20.2
+  benchmark: ^0.3.0
+  test: ^1.25.15
+  collection: ^1.19.1
+

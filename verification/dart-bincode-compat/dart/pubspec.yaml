@@ -1,0 +1,16 @@
+name: bincode_smoke_test
+description: Byte-level compatibility test between Crux's BincodeFfiFormat and d_bincode
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  # English: d_bincode is vendored into the ./d_bincode/ subdirectory as a
+  # self-contained verification artifact — no external git clone required.
+  # Version pinned by the copied source (see d_bincode/pubspec.yaml for upstream version).
+  # 中文:d_bincode 源码已经 vendor 到 ./d_bincode/ 子目录,自包含,
+  # 不需要额外 clone。版本由拷贝的源码决定(见 d_bincode/pubspec.yaml)。
+  d_bincode:
+    path: ./d_bincode

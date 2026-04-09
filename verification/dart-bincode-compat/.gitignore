@@ -1,0 +1,9 @@
+# Rust build artifacts
+rust/target/
+rust/Cargo.lock
+
+# Dart build artifacts
+dart/.dart_tool/
+dart/pubspec.lock
+dart/d_bincode/.dart_tool/
+dart/d_bincode/pubspec.lock
